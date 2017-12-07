@@ -1,0 +1,265 @@
+#Ascii Scene
+#Version 92
+#Generator osgexport 0.15.0
+
+osg::Group {
+  UniqueID 26
+  Name "Root"
+  UserDataContainer TRUE {
+    osg::DefaultUserDataContainer {
+      UniqueID 27
+      UDC_UserObjects 1 {
+        osg::StringValueObject {
+          UniqueID 28
+          Name "source"
+          Value "blender"
+        }
+      }
+    }
+  }
+  Children 2 {
+    osg::MatrixTransform {
+      UniqueID 0
+      Name "Cube"
+      Children 1 {
+        osg::Geode {
+          UniqueID 23
+          Name "GeodeCube"
+          Drawables 1 {
+            osg::Geometry {
+              UniqueID 2
+              Name "Cube_0"
+              StateSet TRUE {
+                osg::StateSet {
+                  UniqueID 3
+                  Name "Material.003"
+                  DataVariance STATIC
+                  UserDataContainer TRUE {
+                    osg::DefaultUserDataContainer {
+                      UniqueID 5
+                      UDC_UserObjects 5 {
+                        osg::StringValueObject {
+                          UniqueID 6
+                          Name "source"
+                          Value "blender"
+                        }
+                        osg::StringValueObject {
+                          UniqueID 19
+                          Name "00_UsePremultiplyAlpha"
+                          Value "false"
+                        }
+                        osg::StringValueObject {
+                          UniqueID 20
+                          Name "00_UseAlpha"
+                          Value "true"
+                        }
+                        osg::StringValueObject {
+                          UniqueID 21
+                          Name "00_DiffuseColor"
+                          Value "1.0"
+                        }
+                        osg::StringValueObject {
+                          UniqueID 22
+                          Name "00_BlendType"
+                          Value "MIX"
+                        }
+                      }
+                    }
+                  }
+                  ModeList 1 {
+                    GL_LIGHTING OFF
+                  }
+                  AttributeList 1 {
+                    osg::Material {
+                      UniqueID 4
+                      Name "Material.003"
+                      DataVariance STATIC
+                      UserDataContainer TRUE {
+                        osg::DefaultUserDataContainer {
+                          UniqueID 7
+                          UDC_UserObjects 10 {
+                            osg::StringValueObject {
+                              UniqueID 8
+                              Name "source"
+                              Value "blender"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 10
+                              Name "DiffuseIntensity"
+                              Value "0.800000011920929"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 11
+                              Name "DiffuseColor"
+                              Value "[0.800000011920929, 0.800000011920929, 0.800000011920929]"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 12
+                              Name "SpecularIntensity"
+                              Value "0.5"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 13
+                              Name "SpecularColor"
+                              Value "[1.0, 1.0, 1.0]"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 14
+                              Name "SpecularHardness"
+                              Value "50"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 15
+                              Name "Shadeless"
+                              Value "true"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 16
+                              Name "Translucency"
+                              Value "0.0"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 17
+                              Name "DiffuseShader"
+                              Value "LAMBERT"
+                            }
+                            osg::StringValueObject {
+                              UniqueID 18
+                              Name "SpecularShader"
+                              Value "COOKTORR"
+                            }
+                          }
+                        }
+                      }
+                      Ambient TRUE Front 0.00000 0.00000 0.00000 1.00000 Back 0.00000 0.00000 0.00000 1.00000
+                      Diffuse TRUE Front 0.64000 0.64000 0.64000 1.00000 Back 0.64000 0.64000 0.64000 1.00000
+                      Specular TRUE Front 0.50000 0.50000 0.50000 1.00000 Back 0.50000 0.50000 0.50000 1.00000
+                      Emission TRUE Front 0.00000 0.00000 0.00000 1.00000 Back 0.00000 0.00000 0.00000 1.00000
+                      Shininess TRUE Front 12.50000 Back 12.50000
+                    }
+                    Value OFF
+                  }
+                  TextureModeList 1 {
+                    Data 1 {
+                      GL_TEXTURE_2D ON
+                    }
+                  }
+                  TextureAttributeList 1 {
+                    Data 1 {
+                      osg::Texture2D {
+                        UniqueID 9
+                        Name "Texture.003"
+                        WRAP_S REPEAT
+                        WRAP_T REPEAT
+                        WRAP_R REPEAT
+                        MIN_FILTER LINEAR_MIPMAP_LINEAR
+                        MAG_FILTER LINEAR
+                        Image TRUE {
+                          UniqueID 29
+                          FileName "textures/Daylight Box UV.png"
+                          WriteHint 0 2
+                        }
+                      }
+                      Value OFF
+                    }
+                  }
+                }
+              }
+              PrimitiveSetList 1 {
+                  DrawElementsUByte GL_QUADS 24 {
+                    0 1 2 3 
+                    4 5 6 2 
+                    7 8 9 6 
+                    10 11 3 9 
+                    12 13 8 7 
+                    6 9 3 2 
+                  }
+              }
+              VertexData {
+                Array TRUE ArrayID 0 Vec3fArray 14 {
+                  -0.31930 -0.31930 -0.31930
+                  -0.31930 0.31930 -0.31930
+                  -0.31930 0.31930 0.31930
+                  -0.31930 -0.31930 0.31930
+                  -0.31930 0.31930 -0.31930
+                  0.31930 0.31930 -0.31930
+                  0.31930 0.31930 0.31930
+                  0.31930 0.31930 -0.31930
+                  0.31930 -0.31930 -0.31930
+                  0.31930 -0.31930 0.31930
+                  0.31930 -0.31930 -0.31930
+                  -0.31930 -0.31930 -0.31930
+                  -0.31930 0.31930 -0.31930
+                  -0.31930 -0.31930 -0.31930
+                }
+                Indices FALSE
+                Binding BIND_PER_VERTEX
+                Normalize 0
+              }
+              NormalData {
+                Array TRUE ArrayID 1 Vec3fArray 14 {
+                  0.57735 0.57735 0.57735
+                  0.57735 -0.57735 0.57735
+                  0.57735 -0.57735 -0.57735
+                  0.57735 0.57735 -0.57735
+                  0.57735 -0.57735 0.57735
+                  -0.57735 -0.57735 0.57735
+                  -0.57735 -0.57735 -0.57735
+                  -0.57735 -0.57735 0.57735
+                  -0.57735 0.57735 0.57735
+                  -0.57735 0.57735 -0.57735
+                  -0.57735 0.57735 0.57735
+                  0.57735 0.57735 0.57735
+                  0.57735 -0.57735 0.57735
+                  0.57735 0.57735 0.57735
+                }
+                Indices FALSE
+                Binding BIND_PER_VERTEX
+                Normalize 0
+              }
+              TexCoordData 1 {
+                Data {
+                  Array TRUE ArrayID 3 Vec2fArray 14 {
+                    0.00001 0.66655
+                    0.00001 0.33350
+                    0.25001 0.33350
+                    0.25001 0.66655
+                    0.25001 0.00044
+                    0.50000 0.00044
+                    0.50000 0.33350
+                    0.74999 0.33350
+                    0.74999 0.66655
+                    0.50000 0.66655
+                    0.50000 0.99960
+                    0.25001 0.99960
+                    0.99999 0.33350
+                    0.99999 0.66655
+                  }
+                  Indices FALSE
+                  Binding BIND_PER_VERTEX
+                  Normalize 0
+                }
+              }
+            }
+          }
+        }
+      }
+      Matrix {
+        282.42938 0.00000 0.00000 0.00000
+        0.00000 -0.00001 -282.42938 0.00000
+        0.00000 282.42938 -0.00001 0.00000
+        0.00000 0.00000 0.00000 1.00000
+      }
+    }
+    osg::MatrixTransform {
+      UniqueID 24
+      Name "biplane.001"
+      Matrix {
+        1.00000 0.00000 0.00000 0.00000
+        0.00000 -0.00000 1.00000 0.00000
+        0.00000 -1.00000 -0.00000 0.00000
+        0.00000 0.00000 0.00000 1.00000
+      }
+    }
+  }
+}
