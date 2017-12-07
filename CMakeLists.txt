@@ -57,7 +57,8 @@ include_directories(
 add_executable(zinc-osg
   main.cpp
   easing.c
-  SkyBox.cpp)
+  SkyBox.cpp
+  Logger.cpp)
 
 
 target_link_libraries(zinc-osg

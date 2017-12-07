@@ -39,6 +39,7 @@
 
 #include <osg/Timer>
 
+#include "Logger.h"
 #include "SkyBox.h"
 #include "Utils.h"
 #include "easing.h"
@@ -63,6 +64,7 @@ osg::Vec3 worldPosition;
 osg::ref_ptr<osg::MatrixTransform> GroupPtr;
 osg::ref_ptr<osg::MatrixTransform> PlayerNode;
 osg::ref_ptr<osg::MatrixTransform> PlaneNode;
+osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
 
 // TODO: In utils file
 /* --- Utils ---*/
@@ -99,9 +101,10 @@ PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
 
   center.y() = 0.0; // TODO: Issue, if center is too close to eye, origin is set
                     // to 0. Must be centered on the subject
-  std::cout << "E Y E        =  " << eye << "\n";
-  std::cout << "C E N T E R  =  " << center << "\n";
-  std::cout << "U P          =  " << up << "\n";
+  SOLEIL__LOGGER_DEBUG("E Y E        =  ", eye);
+  SOLEIL__LOGGER_DEBUG("C E N T E R  =  ", center);
+  SOLEIL__LOGGER_DEBUG("U P          =  ", up);
+
   setByMatrix(camMat);
 }
 
@@ -110,22 +113,25 @@ void PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd &matrix) {
 }
 
 void PlayerFlightCameraManipulator::setByInverseMatrix(
-    const osg::Matrixd &matrix) {
+    const osg::Matrixd & /*matrix*/) {
   assert(false && "// TODO: ");
   // target_->setInitialBound()
 }
 
 osg::Matrixd PlayerFlightCameraManipulator::getMatrix() const {
-  return osg::Matrix::inverse(target_->getMatrix()) * PlayerNode->getMatrix();
-  ;
+  osg::Matrix cameraArcBall;
+  CameraBase->getAttitude().get(cameraArcBall);
+
+  return osg::Matrix::inverse(target_->getMatrix()) * cameraArcBall *
+         PlayerNode->getMatrix();
 }
 
 osg::Matrixd PlayerFlightCameraManipulator::getInverseMatrix() const {
   return osg::Matrix::inverse(getMatrix());
 }
 
-bool PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter &event,
-                                           osgGA::GUIActionAdapter &action) {
+bool PlayerFlightCameraManipulator::handle(
+    const osgGA::GUIEventAdapter &event, osgGA::GUIActionAdapter & /*action*/) {
   const float x = event.getXnormalized();
   const float y = event.getYnormalized();
 
@@ -143,7 +149,7 @@ bool PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter &event,
   /////////////////////////////////////////
   // Move the ROOT node (Camera + Plane) //
   /////////////////////////////////////////
-
+  // TODO: Statics will be members
   static osg::ref_ptr<osg::PositionAttitudeTransform> pat =
       new osg::PositionAttitudeTransform;
   static float accumulatedPitch = 0.0f;
@@ -163,10 +169,11 @@ bool PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter &event,
 
   /* Make sure to cap the pitch to avoid the plane to fligh on its top. This
    * forbid looping but should make the game easier */
-  if ((accumulatedPitch + pitch) > osg::PI_2) {
-    pitch = accumulatedPitch - osg::PI_2;
-  } else if ((accumulatedPitch + pitch) < -osg::PI_2) {
-    pitch = accumulatedPitch + osg::PI_2;
+  constexpr float MaxPitch = 1.256637061f; // 80% of PI/2
+  if ((accumulatedPitch + pitch) > MaxPitch) {
+    pitch = accumulatedPitch - MaxPitch;
+  } else if ((accumulatedPitch + pitch) < -MaxPitch) {
+    pitch = accumulatedPitch + MaxPitch;
   }
   accumulatedPitch += pitch;
 
@@ -180,8 +187,7 @@ bool PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter &event,
   osg::Quat tr = Pitch * pat->getAttitude() * Yaw;
 
   pat->setAttitude(tr);
-  pat->setPosition(pat->getPosition() +
-                   (tr * osg::Vec3(0, 0.06f, 0))); // TODO:  0.06f
+  pat->setPosition(pat->getPosition() + (tr * osg::Vec3(0, 0.06f, 0)));
 
   osg::Matrix matrix;
   pat->computeLocalToWorldMatrix(matrix, nullptr);
@@ -192,14 +198,36 @@ bool PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter &event,
   /////////////////////////////////////////////////
 
   osg::Matrix planeOrientation;
+  float planePitch = 0.0f;
   if (osg::absolute(y) > Min || osg::absolute(x) > Min) {
-    const float planePitch = (osg::absolute(y) > Min) ? y : 0.0f;
+    planePitch = (osg::absolute(y) > Min) ? y : 0.0f;
     const float planeRoll = atan2(x, osg::absolute(y));
 
+#if 1
+    // Plane movement detached from the main group
+    planePitch = (osg::absolute(y) > Min)
+                     ? Sign(y) * ExponentialEaseIn(osg::absolute(y))
+                     : 0.0f;
+#else
+    planePitch = pitch;
+#endif
+    
     planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
                        osg::Matrix::rotate(planePitch, 1, 0, 0);
   }
   PlaneNode->setMatrix(planeOrientation);
+#if 1
+  {
+    static osg::Quat arcBall;
+    osg::Quat arcBallFinal;
+    arcBallFinal.makeRotate(planePitch, 1, 0, 0);
+
+    arcBall.slerp(0.025f, arcBall, arcBallFinal); // TODO: Configurable lerp
+    // TODO: Frame rate fixed lerp
+
+    CameraBase->setAttitude(arcBall);
+  }
+#endif
 
   return true;
 }
@@ -356,14 +384,19 @@ static osg::ref_ptr<osg::MatrixTransform> createPlayerGraph() {
   osg::MatrixTransform *camNode = dynamic_cast<osg::MatrixTransform *>(
       Soleil::GetNodeByName(*cessna, "Camera"));
   assert(camNode); // TODO: Better error system
+
+  CameraBase = new osg::PositionAttitudeTransform;
   osg::ref_ptr<osg::MatrixTransform> newCamNode = new osg::MatrixTransform;
   newCamNode->setMatrix(camNode->getMatrix());
   newCamNode->setName("NewCamera");
-  group->addChild(newCamNode);
+  // group->addChild(newCamNode);
+  CameraBase->addChild(newCamNode);
+  group->addChild(CameraBase);
 
   return group;
 }
 
+#if 0
 static osg::ref_ptr<osg::MatrixTransform> createAxisPath(int size) {
   assert(size >= 0);
 
@@ -380,6 +413,7 @@ static osg::ref_ptr<osg::MatrixTransform> createAxisPath(int size) {
   }
   return root;
 }
+#endif
 
 int main(int // argc
          ,
