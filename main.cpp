@@ -144,7 +144,7 @@ bool PlayerFlightCameraManipulator::handle(
   constexpr float Min = 0.1f;
   constexpr float Speed = 12.5f;
   constexpr float RollSpeed = 1.0f;
-  constexpr float PitchSpeed = 0.05f;
+  constexpr float PitchSpeed = 0.005f;
 
   /////////////////////////////////////////////////
   // Orient the plane to the targetted direction //
@@ -196,7 +196,6 @@ bool PlayerFlightCameraManipulator::handle(
   osg::Quat toRotation;
   toRotation.set(PlaneNode->getMatrix());
   cameraAttitude.slerp(SlerpSpeed * delta, cameraAttitude, toRotation);
-  // TODO: Frame delta
   const osg::Vec3 eye = targetPosition + (cameraAttitude * offset);
   viewMatrix = osg::Matrix::lookAt(eye, center, up);
 
