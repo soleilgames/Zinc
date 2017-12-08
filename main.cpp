@@ -225,6 +225,7 @@ bool PlayerFlightCameraManipulator::handle(
   pat->computeLocalToWorldMatrix(matrix, nullptr);
   PlayerNode->setMatrix(matrix); // TODO: Use PAT for player node
 #endif
+
   /////////////////////////////////////////////////
   // Orient the plane to the targetted direction //
   /////////////////////////////////////////////////
@@ -260,6 +261,18 @@ bool PlayerFlightCameraManipulator::handle(
     CameraBase->setAttitude(arcBall);
   }
 #endif
+
+  ////////////////////////
+  // Move the ROOT node //
+  ////////////////////////
+
+  osg::Matrix matrix =
+      PlayerNode->getMatrix() *
+      osg::Matrix::translate(osg::Matrix::inverse(planeOrientation) *
+                             osg::Vec3(0.0f, 0.06f, 0.0f));
+  // TODO: Frame delta time
+
+  PlayerNode->setMatrix(matrix);
 
   return true;
 }
