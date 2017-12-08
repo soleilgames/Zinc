@@ -124,6 +124,7 @@ void PlayerFlightCameraManipulator::setByInverseMatrix(
 
 osg::Matrixd PlayerFlightCameraManipulator::getMatrix() const {
 
+  // const osg::Vec3 targetPosition = PlaneNode->getMatrix().getTrans();
   const osg::Vec3 targetPosition = PlayerNode->getMatrix().getTrans();
   // const osg::Vec3 eye = targetPosition + offset;
   const osg::Vec3 center = targetPosition;
@@ -229,51 +230,66 @@ bool PlayerFlightCameraManipulator::handle(
   /////////////////////////////////////////////////
   // Orient the plane to the targetted direction //
   /////////////////////////////////////////////////
+  static osg::Quat planeAttitude;
 
   osg::Matrix planeOrientation;
   float planePitch = 0.0f;
+  float planeRoll = 0.0f;
   if (osg::absolute(y) > Min || osg::absolute(x) > Min) {
     planePitch = (osg::absolute(y) > Min) ? y : 0.0f;
-    const float planeRoll = atan2(x, osg::absolute(y));
+    planeRoll = atan2(x, osg::absolute(y));
 
-#if 1
     // Plane movement detached from the main group
     planePitch = (osg::absolute(y) > Min)
                      ? Sign(y) * ExponentialEaseIn(osg::absolute(y))
                      : 0.0f;
-#else
-    planePitch = pitch;
-#endif
+
+    osg::Quat rotation;
+    rotation.makeRotate(-planeRoll * 0.005f, 0, 0, 1);
+    planeAttitude *= rotation;
 
     planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
-                       osg::Matrix::rotate(planePitch, 1, 0, 0);
+                       osg::Matrix::rotate(planePitch, 1, 0, 0)
+        //* osg::Matrix::rotate(-planeRoll * 0.005f, 0, 0, 1)
+        ;
   }
-  PlaneNode->setMatrix(planeOrientation);
-#if 0
-  {
-    static osg::Quat arcBall;
-    osg::Quat arcBallFinal;
-    arcBallFinal.makeRotate(planePitch, 1, 0, 0);
+  osg::Matrix planeAttitudeMatrix;
+  planeAttitude.get(planeAttitudeMatrix);
+  PlaneNode->setMatrix(planeOrientation * planeAttitudeMatrix);
 
-    arcBall.slerp(0.025f, arcBall, arcBallFinal); // TODO: Configurable lerp
-    // TODO: Frame rate fixed lerp
-
-    CameraBase->setAttitude(arcBall);
-  }
-#endif
-
-  ////////////////////////
-  // Move the ROOT node //
-  ////////////////////////
+////////////////////////
+// Move the ROOT node //
+////////////////////////
+#if 1
 
   osg::Matrix matrix =
-      PlayerNode->getMatrix() *
-      osg::Matrix::translate(osg::Matrix::inverse(planeOrientation) *
-                             osg::Vec3(0.0f, 0.06f, 0.0f));
+      osg::Matrix::translate(
+          osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix) *
+          osg::Vec3(0.0f, 0.06f, 0.0f)) *
+      PlayerNode->getMatrix()
+      // osg::Matrix::rotate(-planeRoll * 0.001f, osg::Vec3(0, 0, 1))
+      ;
   // TODO: Frame delta time
 
   PlayerNode->setMatrix(matrix);
+#else
+  osg::Matrix matrix =
+      osg::Matrix::translate( // osg::Matrix::rotate(planeRoll * 1.0f,
+                              // osg::Vec3(0, 0, 1)) *
+          osg::Matrix::inverse(planeOrientation) *
+          osg::Vec3(0.0f, 0.06f, 0.0f)) *
+      PlaneNode->getMatrix() *
+      osg::Matrix::rotate(-planeRoll * 0.001f, osg::Vec3(0, 0, 1))
+      // osg::Matrix::translate(//osg::Matrix::rotate(planeRoll * 1.0f,
+      // osg::Vec3(0, 0, 1)) *
+      // 			     osg::Matrix::inverse(planeOrientation) *
+      //                          osg::Vec3(0.0f, 0.06f, 0.0f))
+      //* osg::Matrix::rotate(-planeRoll * 0.001f, osg::Vec3(0, 0, 1))
+      ;
+  // TODO: Frame delta time
 
+  PlaneNode->setMatrix(matrix);
+#endif
   return true;
 }
 
