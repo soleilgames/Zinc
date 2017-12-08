@@ -69,7 +69,7 @@ osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
 // TODO: In utils file
 /* --- Utils ---*/
 template <typename T> int Sign(T val) { return (T(0) < val) - (val < T(0)); }
-template <typename T, typename U> U mix(T x, T y, U a) {
+template <typename T, typename U> T mix(T x, T y, U a) {
   return x * (1.0 - a) + y * a;
 }
 /* --- Utils ---*/
@@ -83,33 +83,37 @@ public:
               osgGA::GUIActionAdapter &action) override;
 
 public:
-  void setByMatrix(const osg::Matrixd &matrix);
-  void setByInverseMatrix(const osg::Matrixd &matrix);
-  osg::Matrixd getMatrix() const;
-  osg::Matrixd getInverseMatrix() const;
+  void setByMatrix(const osg::Matrixd &matrix) override;
+  void setByInverseMatrix(const osg::Matrixd &matrix) override;
+  osg::Matrixd getMatrix() const override;
+  osg::Matrixd getInverseMatrix() const override;
 
 private:
   osg::MatrixTransform *target_;
+  osg::Vec3 offset;
 };
 
 PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
     osg::MatrixTransform *target)
-    : target_(target) {
+    : target_(target), offset(0, -10, 0) {
   osg::Vec3 eye, center, up;
-  osg::Matrix camMat = osg::Matrix::inverse(target_->getMatrix());
-  camMat.getLookAt(eye, center, up);
 
-  center.y() = 0.0; // TODO: Issue, if center is too close to eye, origin is set
-                    // to 0. Must be centered on the subject
-  SOLEIL__LOGGER_DEBUG("E Y E        =  ", eye);
-  SOLEIL__LOGGER_DEBUG("C E N T E R  =  ", center);
-  SOLEIL__LOGGER_DEBUG("U P          =  ", up);
+  // osg::Vec3 targetPosition = target->getMatrix().getTrans();
+  // eye = targetPosition + offset;
+  // center = targetPosition;
+  // up = osg::Vec3(0, 0, 1);
 
-  setByMatrix(camMat);
+  // osg::Matrix camMat = osg::Matrix::lookAt(eye, center, up);
+
+  // SOLEIL__LOGGER_DEBUG("E Y E        =  ", eye);
+  // SOLEIL__LOGGER_DEBUG("C E N T E R  =  ", center);
+  // SOLEIL__LOGGER_DEBUG("U P          =  ", up);
+
+  // setByMatrix(camMat);
 }
 
 void PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd &matrix) {
-  target_->setMatrix(matrix);
+  // target_->setMatrix(matrix);
 }
 
 void PlayerFlightCameraManipulator::setByInverseMatrix(
@@ -119,11 +123,38 @@ void PlayerFlightCameraManipulator::setByInverseMatrix(
 }
 
 osg::Matrixd PlayerFlightCameraManipulator::getMatrix() const {
-  osg::Matrix cameraArcBall;
-  CameraBase->getAttitude().get(cameraArcBall);
 
-  return osg::Matrix::inverse(target_->getMatrix()) * cameraArcBall *
-         PlayerNode->getMatrix();
+  const osg::Vec3 targetPosition = PlayerNode->getMatrix().getTrans();
+  // const osg::Vec3 eye = targetPosition + offset;
+  const osg::Vec3 center = targetPosition;
+  const osg::Vec3 up = osg::Vec3(0, 0, 1);
+
+// const osg::Matrix tr = osg::Matrix::translate(eye);
+// const osg::Matrix invtr = osg::Matrix::translate(-eye);
+// const osg::Vec3 dest =  (invtr * PlaneNode->getMatrix() * tr).getTrans();
+// osg::Quat quat;
+// quat.makeRotate(eye, dest);
+
+#if 0
+  const osg::Matrix camMat = osg::Matrix::lookAt(eye, center, up);
+  const osg::Vec3 eye =
+      targetPosition + (osg::Matrix::inverse(PlaneNode->getMatrix()) * offset);
+  return osg::Matrix::inverse(camMat);
+#else
+  osg::Quat toRotation;
+  toRotation.set(PlaneNode->getMatrix());
+
+  static osg::Quat current;
+
+  current.slerp(0.08f, current, toRotation);
+  // TODO: Frame delta
+
+  const osg::Vec3 eye = targetPosition + (current * offset);
+
+  const osg::Matrix camMat = osg::Matrix::lookAt(eye, center, up);
+  return osg::Matrix::inverse(camMat);
+
+#endif
 }
 
 osg::Matrixd PlayerFlightCameraManipulator::getInverseMatrix() const {
@@ -146,9 +177,10 @@ bool PlayerFlightCameraManipulator::handle(
   const float Min = 0.3f;
   const float speed = 0.0125f;
 
-  /////////////////////////////////////////
-  // Move the ROOT node (Camera + Plane) //
-  /////////////////////////////////////////
+/////////////////////////////////////////
+// Move the ROOT node (Camera + Plane) //
+/////////////////////////////////////////
+#if 0
   // TODO: Statics will be members
   static osg::ref_ptr<osg::PositionAttitudeTransform> pat =
       new osg::PositionAttitudeTransform;
@@ -192,7 +224,7 @@ bool PlayerFlightCameraManipulator::handle(
   osg::Matrix matrix;
   pat->computeLocalToWorldMatrix(matrix, nullptr);
   PlayerNode->setMatrix(matrix); // TODO: Use PAT for player node
-
+#endif
   /////////////////////////////////////////////////
   // Orient the plane to the targetted direction //
   /////////////////////////////////////////////////
@@ -211,12 +243,12 @@ bool PlayerFlightCameraManipulator::handle(
 #else
     planePitch = pitch;
 #endif
-    
+
     planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
                        osg::Matrix::rotate(planePitch, 1, 0, 0);
   }
   PlaneNode->setMatrix(planeOrientation);
-#if 1
+#if 0
   {
     static osg::Quat arcBall;
     osg::Quat arcBallFinal;
