@@ -232,6 +232,8 @@ bool PlayerFlightCameraManipulator::handle(
   /////////////////////////////////////////////////
   static osg::Quat planeAttitude;
 
+  constexpr float MaxPitch = 1.256637061f; // 80% of PI/2
+
   osg::Matrix planeOrientation;
   static float planePitch = 0.0f;
   float planeRoll = 0.0f;
@@ -242,6 +244,7 @@ bool PlayerFlightCameraManipulator::handle(
     planePitch += (osg::absolute(y) > Min)
                       ? 0.05f * Sign(y) * ExponentialEaseIn(osg::absolute(y))
                       : 0.0f;
+    planePitch = osg::clampBetween(planePitch, -MaxPitch, MaxPitch);
 
     osg::Quat rotation;
     rotation.makeRotate(-planeRoll * 0.005f, 0, 0, 1);
