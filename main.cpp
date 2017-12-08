@@ -175,8 +175,8 @@ bool PlayerFlightCameraManipulator::handle(
   // 4. Make the camera follow the plane rotation? //
   ///////////////////////////////////////////////////
 
-  const float Min = 0.3f;
-  const float speed = 0.0125f;
+  constexpr float Min = 0.1f;
+  constexpr float speed = 0.0125f;
 
 /////////////////////////////////////////
 // Move the ROOT node (Camera + Plane) //
@@ -237,19 +237,19 @@ bool PlayerFlightCameraManipulator::handle(
   osg::Matrix planeOrientation;
   static float planePitch = 0.0f;
   float planeRoll = 0.0f;
-  if (osg::absolute(y) > Min || osg::absolute(x) > Min) {
-    // planePitch += (osg::absolute(y) > Min) ? y : 0.0f;
-    planeRoll = atan2(x, osg::absolute(y));
+  // if (osg::absolute(y) > Min || osg::absolute(x) > Min) {
+  planeRoll = atan2(Sign(x) * ExponentialEaseIn(osg::absolute(x)),
+                    (osg::absolute(y) > Min) ? osg::absolute(y) : Min);
 
-    planePitch += (osg::absolute(y) > Min)
-                      ? 0.05f * Sign(y) * ExponentialEaseIn(osg::absolute(y))
-                      : 0.0f;
-    planePitch = osg::clampBetween(planePitch, -MaxPitch, MaxPitch);
+  planePitch += (osg::absolute(y) > Min)
+                    ? 0.05f * Sign(y) * ExponentialEaseIn(osg::absolute(y))
+                    : 0.0f;
+  planePitch = osg::clampBetween(planePitch, -MaxPitch, MaxPitch);
 
-    osg::Quat rotation;
-    rotation.makeRotate(-planeRoll * 0.005f, 0, 0, 1);
-    planeAttitude *= rotation;
-  }
+  osg::Quat rotation;
+  rotation.makeRotate(-planeRoll * 0.005f, 0, 0, 1);
+  planeAttitude *= rotation;
+  //}
 
   planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
                      osg::Matrix::rotate(planePitch, 1, 0, 0)
