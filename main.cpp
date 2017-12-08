@@ -233,26 +233,26 @@ bool PlayerFlightCameraManipulator::handle(
   static osg::Quat planeAttitude;
 
   osg::Matrix planeOrientation;
-  float planePitch = 0.0f;
+  static float planePitch = 0.0f;
   float planeRoll = 0.0f;
   if (osg::absolute(y) > Min || osg::absolute(x) > Min) {
-    planePitch = (osg::absolute(y) > Min) ? y : 0.0f;
+    // planePitch += (osg::absolute(y) > Min) ? y : 0.0f;
     planeRoll = atan2(x, osg::absolute(y));
 
-    // Plane movement detached from the main group
-    planePitch = (osg::absolute(y) > Min)
-                     ? Sign(y) * ExponentialEaseIn(osg::absolute(y))
-                     : 0.0f;
+    planePitch += (osg::absolute(y) > Min)
+                      ? 0.05f * Sign(y) * ExponentialEaseIn(osg::absolute(y))
+                      : 0.0f;
 
     osg::Quat rotation;
     rotation.makeRotate(-planeRoll * 0.005f, 0, 0, 1);
     planeAttitude *= rotation;
-
-    planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
-                       osg::Matrix::rotate(planePitch, 1, 0, 0)
-        //* osg::Matrix::rotate(-planeRoll * 0.005f, 0, 0, 1)
-        ;
   }
+
+  planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
+                     osg::Matrix::rotate(planePitch, 1, 0, 0)
+      //* osg::Matrix::rotate(-planeRoll * 0.005f, 0, 0, 1)
+      ;
+
   osg::Matrix planeAttitudeMatrix;
   planeAttitude.get(planeAttitudeMatrix);
   PlaneNode->setMatrix(planeOrientation * planeAttitudeMatrix);
