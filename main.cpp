@@ -90,72 +90,32 @@ public:
 
 private:
   osg::MatrixTransform *target_;
-  osg::Vec3 offset;
+  osg::Vec3 offset;        ///< Camera Offset to the target
+  osg::Quat planeAttitude; ///< Target orientation (z axis)
+  float planePitch;        ///< Model pitch
+  double previousTime;     /// Used to compute delta
+
+private:
+  osg::Quat cameraAttitude; /// Used to slerp the rotation to the target
+  osg::Matrix viewMatrix;
 };
 
 PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
     osg::MatrixTransform *target)
-    : target_(target), offset(0, -10, 0) {
-  osg::Vec3 eye, center, up;
-
-  // osg::Vec3 targetPosition = target->getMatrix().getTrans();
-  // eye = targetPosition + offset;
-  // center = targetPosition;
-  // up = osg::Vec3(0, 0, 1);
-
-  // osg::Matrix camMat = osg::Matrix::lookAt(eye, center, up);
-
-  // SOLEIL__LOGGER_DEBUG("E Y E        =  ", eye);
-  // SOLEIL__LOGGER_DEBUG("C E N T E R  =  ", center);
-  // SOLEIL__LOGGER_DEBUG("U P          =  ", up);
-
-  // setByMatrix(camMat);
-}
+    : target_(target), offset(0, -10, 0), planeAttitude(), planePitch(0.0f),
+      previousTime(-1.0) {}
 
 void PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd &matrix) {
-  // target_->setMatrix(matrix);
+  assert(false && "// TODO: ");
 }
 
 void PlayerFlightCameraManipulator::setByInverseMatrix(
     const osg::Matrixd & /*matrix*/) {
   assert(false && "// TODO: ");
-  // target_->setInitialBound()
 }
 
 osg::Matrixd PlayerFlightCameraManipulator::getMatrix() const {
-
-  // const osg::Vec3 targetPosition = PlaneNode->getMatrix().getTrans();
-  const osg::Vec3 targetPosition = PlayerNode->getMatrix().getTrans();
-  // const osg::Vec3 eye = targetPosition + offset;
-  const osg::Vec3 center = targetPosition;
-  const osg::Vec3 up = osg::Vec3(0, 0, 1);
-
-// const osg::Matrix tr = osg::Matrix::translate(eye);
-// const osg::Matrix invtr = osg::Matrix::translate(-eye);
-// const osg::Vec3 dest =  (invtr * PlaneNode->getMatrix() * tr).getTrans();
-// osg::Quat quat;
-// quat.makeRotate(eye, dest);
-
-#if 0
-  const osg::Matrix camMat = osg::Matrix::lookAt(eye, center, up);
-  const osg::Vec3 eye =
-      targetPosition + (osg::Matrix::inverse(PlaneNode->getMatrix()) * offset);
-  return osg::Matrix::inverse(camMat);
-#else
-  osg::Quat toRotation;
-  toRotation.set(PlaneNode->getMatrix());
-
-  static osg::Quat current;
-
-  current.slerp(0.08f, current, toRotation);
-  // TODO: Frame delta
-
-  const osg::Vec3 eye = targetPosition + (current * offset);
-
-  const osg::Matrix camMat = osg::Matrix::lookAt(eye, center, up);
-  return osg::Matrix::inverse(camMat);
-
-#endif
+  return osg::Matrix::inverse(viewMatrix);
 }
 
 osg::Matrixd PlayerFlightCameraManipulator::getInverseMatrix() const {
@@ -167,6 +127,12 @@ bool PlayerFlightCameraManipulator::handle(
   const float x = event.getXnormalized();
   const float y = event.getYnormalized();
 
+  if (previousTime < 0.0) {
+    previousTime = event.getTime();
+  }
+  const double delta = event.getTime() - previousTime;
+  previousTime = event.getTime();
+
   ///////////////////////////////////////////////////
   // // TODO: Work in Progress			   //
   // 1. Make sure there is no static but members   //
@@ -176,123 +142,64 @@ bool PlayerFlightCameraManipulator::handle(
   ///////////////////////////////////////////////////
 
   constexpr float Min = 0.1f;
-  constexpr float speed = 0.0125f;
-
-/////////////////////////////////////////
-// Move the ROOT node (Camera + Plane) //
-/////////////////////////////////////////
-#if 0
-  // TODO: Statics will be members
-  static osg::ref_ptr<osg::PositionAttitudeTransform> pat =
-      new osg::PositionAttitudeTransform;
-  static float accumulatedPitch = 0.0f;
-
-  float yaw = 0;
-  float pitch = 0;
-
-  /* Ease the movements for smoother experience */
-  const float absoluteX = osg::absolute(x);
-  if (absoluteX >= Min) {
-    yaw = -Sign(x) * ExponentialEaseIn(absoluteX) * speed;
-  }
-  const float absoluteY = osg::absolute(y);
-  if (absoluteY >= Min) {
-    pitch = Sign(y) * ExponentialEaseIn(osg::absolute(y)) * speed;
-  }
-
-  /* Make sure to cap the pitch to avoid the plane to fligh on its top. This
-   * forbid looping but should make the game easier */
-  constexpr float MaxPitch = 1.256637061f; // 80% of PI/2
-  if ((accumulatedPitch + pitch) > MaxPitch) {
-    pitch = accumulatedPitch - MaxPitch;
-  } else if ((accumulatedPitch + pitch) < -MaxPitch) {
-    pitch = accumulatedPitch + MaxPitch;
-  }
-  accumulatedPitch += pitch;
-
-  osg::Quat Yaw;
-  Yaw.makeRotate(yaw, 0, 0, 1);
-  osg::Quat Pitch;
-  Pitch.makeRotate(pitch, 1, 0, 0);
-
-  /* Order matter: This combination avoid the Roll when Pitching and Yawing at
-   * the same time.*/
-  osg::Quat tr = Pitch * pat->getAttitude() * Yaw;
-
-  pat->setAttitude(tr);
-  pat->setPosition(pat->getPosition() + (tr * osg::Vec3(0, 0.06f, 0)));
-
-  osg::Matrix matrix;
-  pat->computeLocalToWorldMatrix(matrix, nullptr);
-  PlayerNode->setMatrix(matrix); // TODO: Use PAT for player node
-#endif
+  constexpr float Speed = 12.5f;
+  constexpr float RollSpeed = 1.0f;
+  constexpr float PitchSpeed = 0.05f;
 
   /////////////////////////////////////////////////
   // Orient the plane to the targetted direction //
   /////////////////////////////////////////////////
-  static osg::Quat planeAttitude;
 
   constexpr float MaxPitch = 1.256637061f; // 80% of PI/2
 
   osg::Matrix planeOrientation;
-  static float planePitch = 0.0f;
   float planeRoll = 0.0f;
-  // if (osg::absolute(y) > Min || osg::absolute(x) > Min) {
-  planeRoll = atan2(Sign(x) * ExponentialEaseIn(osg::absolute(x)),
-                    (osg::absolute(y) > Min) ? osg::absolute(y) : Min);
+  planeRoll =
+      RollSpeed * atan2(Sign(x) * ExponentialEaseIn(osg::absolute(x)),
+                        (osg::absolute(y) > Min) ? osg::absolute(y) : Min);
 
   planePitch += (osg::absolute(y) > Min)
-                    ? 0.05f * Sign(y) * ExponentialEaseIn(osg::absolute(y))
+                    ? PitchSpeed * Sign(y) * ExponentialEaseIn(osg::absolute(y))
                     : 0.0f;
   planePitch = osg::clampBetween(planePitch, -MaxPitch, MaxPitch);
 
   osg::Quat rotation;
   rotation.makeRotate(-planeRoll * 0.005f, 0, 0, 1);
   planeAttitude *= rotation;
-  //}
 
   planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
-                     osg::Matrix::rotate(planePitch, 1, 0, 0)
-      //* osg::Matrix::rotate(-planeRoll * 0.005f, 0, 0, 1)
-      ;
+                     osg::Matrix::rotate(planePitch, 1, 0, 0);
 
   osg::Matrix planeAttitudeMatrix;
   planeAttitude.get(planeAttitudeMatrix);
   PlaneNode->setMatrix(planeOrientation * planeAttitudeMatrix);
 
-////////////////////////
-// Move the ROOT node //
-////////////////////////
-#if 1
-
+  ////////////////////////
+  // Move the ROOT node //
+  ////////////////////////
   osg::Matrix matrix =
       osg::Matrix::translate(
           osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix) *
-          osg::Vec3(0.0f, 0.06f, 0.0f)) *
-      PlayerNode->getMatrix()
-      // osg::Matrix::rotate(-planeRoll * 0.001f, osg::Vec3(0, 0, 1))
-      ;
-  // TODO: Frame delta time
+          osg::Vec3(0.0f, Speed * delta, 0.0f)) *
+      PlayerNode->getMatrix();
 
   PlayerNode->setMatrix(matrix);
-#else
-  osg::Matrix matrix =
-      osg::Matrix::translate( // osg::Matrix::rotate(planeRoll * 1.0f,
-                              // osg::Vec3(0, 0, 1)) *
-          osg::Matrix::inverse(planeOrientation) *
-          osg::Vec3(0.0f, 0.06f, 0.0f)) *
-      PlaneNode->getMatrix() *
-      osg::Matrix::rotate(-planeRoll * 0.001f, osg::Vec3(0, 0, 1))
-      // osg::Matrix::translate(//osg::Matrix::rotate(planeRoll * 1.0f,
-      // osg::Vec3(0, 0, 1)) *
-      // 			     osg::Matrix::inverse(planeOrientation) *
-      //                          osg::Vec3(0.0f, 0.06f, 0.0f))
-      //* osg::Matrix::rotate(-planeRoll * 0.001f, osg::Vec3(0, 0, 1))
-      ;
-  // TODO: Frame delta time
 
-  PlaneNode->setMatrix(matrix);
-#endif
+  ////////////////////////////
+  // Update the View Matrix //
+  ////////////////////////////
+  constexpr float SlerpSpeed = 3.0f;
+
+  const osg::Vec3 targetPosition = PlayerNode->getMatrix().getTrans();
+  const osg::Vec3 center = targetPosition;
+  const osg::Vec3 up = osg::Vec3(0, 0, 1);
+  osg::Quat toRotation;
+  toRotation.set(PlaneNode->getMatrix());
+  cameraAttitude.slerp(SlerpSpeed * delta, cameraAttitude, toRotation);
+  // TODO: Frame delta
+  const osg::Vec3 eye = targetPosition + (cameraAttitude * offset);
+  viewMatrix = osg::Matrix::lookAt(eye, center, up);
+
   return true;
 }
 
