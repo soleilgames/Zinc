@@ -36,10 +36,12 @@
 #include <osgGA/CameraManipulator>
 #include <osgGA/NodeTrackerManipulator>
 #include <osgViewer/Viewer>
+#include <osgViewer/ViewerEventHandlers>
 
 #include <osg/Timer>
 
 #include "Logger.h"
+#include "ShootTracer.h"
 #include "SkyBox.h"
 #include "Utils.h"
 #include "easing.h"
@@ -72,7 +74,45 @@ template <typename T> int Sign(T val) { return (T(0) < val) - (val < T(0)); }
 template <typename T, typename U> T mix(T x, T y, U a) {
   return x * (1.0 - a) + y * a;
 }
+template <typename T> T Random(T maxValue) {
+  return static_cast<T>(rand()) / (static_cast<T>(RAND_MAX / maxValue));
+}
 /* --- Utils ---*/
+
+// TODO: Not here:
+
+class DrawableStateCallback : public osg::Drawable::UpdateCallback {
+public:
+  float time;
+
+public:
+  DrawableStateCallback(float speed) : time(0.0f), speed(speed) {}
+
+  // virtual void operator()(osg::Node *node, osg::NodeVisitor *nv) {
+  void update(osg::NodeVisitor *, osg::Drawable *d) {
+
+    osg::StateAttribute *attribute =
+        d->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXGEN);
+    osg::TexGen *texgen = dynamic_cast<osg::TexGen *>(attribute);
+    // if (texgen) {
+    time += 1.00f / speed; // TODO: Framerate
+    texgen->getPlane(osg::TexGen::R)[3] = time;
+    //}
+
+    // traverse(node, nv);
+  }
+
+private:
+  float speed;
+};
+
+osg::ref_ptr<osg::Geode> shootTracers = new osg::Geode;
+osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
+class DrawableStateCallback;
+std::vector<osg::ref_ptr<DrawableStateCallback>> explosionImpostor;
+constexpr int NumOfExplosions = 150;
+std::vector<osg::ref_ptr<Soleil::ShootTracerCallback>> tracerUpdaters;
+//
 
 /* --- PlayerFlightCameraManipulator */
 class PlayerFlightCameraManipulator : public osgGA::CameraManipulator {
@@ -93,7 +133,7 @@ private:
   osg::Vec3 offset;        ///< Camera Offset to the target
   osg::Quat planeAttitude; ///< Target orientation (z axis)
   float planePitch;        ///< Model pitch
-  double previousTime;     /// Used to compute delta
+  double previousTime;     ///< Used to compute delta
 
 private:
   osg::Quat cameraAttitude; /// Used to slerp the rotation to the target
@@ -119,7 +159,7 @@ osg::Matrixd PlayerFlightCameraManipulator::getMatrix() const {
 }
 
 osg::Matrixd PlayerFlightCameraManipulator::getInverseMatrix() const {
-  return osg::Matrix::inverse(getMatrix());
+  return viewMatrix;
 }
 
 bool PlayerFlightCameraManipulator::handle(
@@ -143,6 +183,7 @@ bool PlayerFlightCameraManipulator::handle(
 
   constexpr float Min = 0.1f;
   constexpr float Speed = 12.5f;
+  // constexpr float Speed = 0.0f;
   constexpr float RollSpeed = 1.0f;
   constexpr float PitchSpeed = 0.005f;
 
@@ -177,10 +218,11 @@ bool PlayerFlightCameraManipulator::handle(
   ////////////////////////
   // Move the ROOT node //
   ////////////////////////
-  osg::Matrix matrix =
-      osg::Matrix::translate(
-          osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix) *
-          osg::Vec3(0.0f, Speed * delta, 0.0f)) *
+  const osg::Matrix planeOrientationMatrix =
+      osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix);
+  const osg::Matrix matrix =
+      osg::Matrix::translate(planeOrientationMatrix *
+                             osg::Vec3(0.0f, Speed * delta, 0.0f)) *
       PlayerNode->getMatrix();
 
   PlayerNode->setMatrix(matrix);
@@ -198,6 +240,37 @@ bool PlayerFlightCameraManipulator::handle(
   cameraAttitude.slerp(SlerpSpeed * delta, cameraAttitude, toRotation);
   const osg::Vec3 eye = targetPosition + (cameraAttitude * offset);
   viewMatrix = osg::Matrix::lookAt(eye, center, up);
+
+  /////////////////////
+  // Test click-fire //
+  /////////////////////
+  switch (event.getEventType()) {
+  case osgGA::GUIEventAdapter::EventType::PUSH: {
+    // TODO: Every x frames
+    static int exp = 0;
+
+    const int id = exp % NumOfExplosions;
+    explosion->setPosition(id,
+                           PlayerNode->getMatrix().getTrans() +
+                               planeOrientationMatrix * osg::Vec3(0, 100, 0));
+    explosionImpostor[id]->time = 0.0f;
+    explosion->computeBound();
+    explosion->dirtyBound();
+
+    // TODO: Reuse objects
+    // assert(shootTracers->getNumDrawables() >= id);
+    // shootTracers->getDrawable()
+    osg::ref_ptr<Soleil::ShootTracer> tracer =
+        new Soleil::ShootTracer(400, 5.0f, osg::Vec3(1.0f, 1.0f, 0.0f));
+    shootTracers->addDrawable(tracer);
+    osg::ref_ptr<Soleil::ShootTracerCallback> tracerUpdate =
+      new Soleil::ShootTracerCallback(tracer);
+    shootTracers->addEventCallback(tracerUpdate);
+
+    ++exp;
+
+  } break;
+  }
 
   return true;
 }
@@ -297,9 +370,6 @@ public:
     texgen->getPlane(osg::TexGen::R)[3] += 1.00f / 17.0f; // TODO: Framerate
     //}
 
-    // note, callback is responsible for scenegraph traversal so
-    // should always include call the traverse(node,nv) to ensure
-    // that the rest of callbacks and the scene graph are traversed.
     traverse(node, nv);
   }
 
@@ -429,8 +499,9 @@ int main(int // argc
   // ----------------------- //
   /////////////////////////////
 
-  osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
+  // osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
   explosion->setMode(osg::Billboard::POINT_ROT_EYE);
+  explosion->setDataVariance(osg::Object::DataVariance::DYNAMIC);
   osg::StateSet *ss = explosion->getOrCreateStateSet();
   ss->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
   // osg::ref_ptr<osg::StateAttribute> blend =
@@ -439,9 +510,32 @@ int main(int // argc
   // ss->setAttributeAndModes(blend, osg::StateAttribute::ON);
 
   osg::ref_ptr<osg::Geometry> ex = createExplosionQuad();
-  explosion->addDrawable(ex, osg::Vec3(0.0, 1.0f, 1.0f));
-  explosion->setUpdateCallback(new UpdateStateCallback(ex->getStateSet()));
+  for (int i = 0; i < NumOfExplosions; ++i) {
+    osg::ref_ptr<osg::Geometry> dup = dynamic_cast<osg::Geometry *>(
+        ex->clone(osg::CopyOp::DEEP_COPY_STATESETS |
+                  osg::CopyOp::DEEP_COPY_STATEATTRIBUTES));
+
+    osg::ref_ptr<DrawableStateCallback> cb =
+        new DrawableStateCallback(Random(50.0f) + 50.0f);
+    explosionImpostor.push_back(cb);
+    dup->setUpdateCallback(cb);
+    explosion->addDrawable(dup, osg::Vec3(0.0f, (float)i, 1.0f));
+  }
+
+  // explosion->setUpdateCallback(new UpdateStateCallback(ex->getStateSet()));
   root->addChild(explosion);
+
+  // Configure Shoot tracer geode
+  {
+    shootTracers->getOrCreateStateSet()->setMode(GL_LIGHTING,
+                                                 osg::StateAttribute::OFF);
+    shootTracers->getOrCreateStateSet()->setMode(GL_BLEND,
+                                                 osg::StateAttribute::ON);
+    shootTracers->getOrCreateStateSet()->setRenderingHint(
+        osg::StateSet::TRANSPARENT_BIN);
+    // shootTracers->setEventCallback(new Soleil::ShootTracerCallback);
+    root->addChild(shootTracers);
+  }
 
   osgViewer::Viewer viewer;
   viewer.setSceneData(root);
@@ -467,6 +561,7 @@ int main(int // argc
       new PlayerFlightCameraManipulator(camNode);
 
   viewer.setCameraManipulator(playerManipulator);
+  viewer.addEventHandler(new osgViewer::StatsHandler());
 
   /////////////////////////////////////////////////
   // ------------------------------------------- //

@@ -57,8 +57,11 @@ include_directories(
 add_executable(zinc-osg
   main.cpp
   easing.c
+  
   SkyBox.cpp
-  Logger.cpp)
+  Logger.cpp
+  ShootTracer.cpp
+  )
 
 
 target_link_libraries(zinc-osg
