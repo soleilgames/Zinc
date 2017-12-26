@@ -111,7 +111,8 @@ osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
 class DrawableStateCallback;
 std::vector<osg::ref_ptr<DrawableStateCallback>> explosionImpostor;
 constexpr int NumOfExplosions = 150;
-std::vector<osg::ref_ptr<Soleil::ShootTracerCallback>> tracerUpdaters;
+osg::ref_ptr<Soleil::ShootTracerCallback> tracerUpdater =
+    new Soleil::ShootTracerCallback;
 //
 
 /* --- PlayerFlightCameraManipulator */
@@ -249,7 +250,7 @@ bool PlayerFlightCameraManipulator::handle(
     // TODO: Every x frames
     static int exp = 0;
 
-    const int id = exp % NumOfExplosions;
+    const unsigned int id = exp % NumOfExplosions;
     explosion->setPosition(id,
                            PlayerNode->getMatrix().getTrans() +
                                planeOrientationMatrix * osg::Vec3(0, 100, 0));
@@ -257,16 +258,9 @@ bool PlayerFlightCameraManipulator::handle(
     explosion->computeBound();
     explosion->dirtyBound();
 
-    // TODO: Reuse objects
-    // assert(shootTracers->getNumDrawables() >= id);
-    // shootTracers->getDrawable()
-    osg::ref_ptr<Soleil::ShootTracer> tracer =
-        new Soleil::ShootTracer(400, 5.0f, osg::Vec3(1.0f, 1.0f, 0.0f));
-    shootTracers->addDrawable(tracer);
-    osg::ref_ptr<Soleil::ShootTracerCallback> tracerUpdate =
-      new Soleil::ShootTracerCallback(tracer);
-    shootTracers->addEventCallback(tracerUpdate);
-
+    assert(shootTracers->getNumDrawables() >= id);
+    tracerUpdater->tracers[id]->updateHead(
+        targetPosition, planeOrientationMatrix * osg::Vec3f(0, 1, 0));
     ++exp;
 
   } break;
@@ -533,7 +527,16 @@ int main(int // argc
                                                  osg::StateAttribute::ON);
     shootTracers->getOrCreateStateSet()->setRenderingHint(
         osg::StateSet::TRANSPARENT_BIN);
-    // shootTracers->setEventCallback(new Soleil::ShootTracerCallback);
+
+    tracerUpdater = new Soleil::ShootTracerCallback;
+    shootTracers->setEventCallback(tracerUpdater);
+    for (int i = 0; i < NumOfExplosions; ++i) {
+      osg::ref_ptr<Soleil::ShootTracer> tracer =
+          new Soleil::ShootTracer(100, 0.1f, osg::Vec3(1.0f, 1.0f, 0.0f));
+      shootTracers->addDrawable(tracer);
+      tracerUpdater->tracers.push_back(tracer);
+    }
+
     root->addChild(shootTracers);
   }
 

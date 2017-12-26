@@ -7,38 +7,42 @@
 
 namespace Soleil {
 
-  class ShootTracer : public osg::Geometry
-  {
-  public:
-    ShootTracer(int numberOfPoints, float width, const osg::Vec3& color);
+class ShootTracer : public osg::Geometry {
+public:
+  ShootTracer(int numberOfPoints, float width, const osg::Vec3 &color);
 
-  protected:
-    ~ShootTracer();
+protected:
+  ~ShootTracer();
 
-  public:
-    void updateTail(const osg::Matrix& modelMatrix);
+public:
+  void updateHead(const osg::Vec3 &position, const osg::Vec3 &direction);
+  void updateTail();
 
-  private:
-    int       numberOfPoints;
-    float     halfWidth;
-    osg::Vec3 color;
+private:
+  int numberOfPoints;
+  float halfWidth;
+  osg::Vec3 color;
 
-  private:
-    osg::ref_ptr<osg::Vec3Array> vertices;
-    osg::ref_ptr<osg::Vec3Array> normals;
-    osg::ref_ptr<osg::Vec4Array> colors;
-    // TODO: Use the one in geometry
-  };
+private:
+  osg::Vec3 direction;
 
-  class ShootTracerCallback : public osg::NodeCallback
-  {
-  public:
-    ShootTracerCallback(ShootTracer* shootTracer);
-    void operator()(osg::Node* node, osg::NodeVisitor* visitor);
+private:
+  osg::ref_ptr<osg::Vec3Array> vertices;
+  osg::ref_ptr<osg::Vec3Array> normals;
+  osg::ref_ptr<osg::Vec4Array> colors;
+  // TODO: Use the one in geometry
+};
 
-  private:
-    osg::observer_ptr<ShootTracer> shootTracer;
-  };
+class ShootTracerCallback : public osg::NodeCallback {
+public:
+  ShootTracerCallback();
+  void operator()(osg::Node *node, osg::NodeVisitor *visitor);
+
+public:
+  //std::vector<osg::ref_ptr<ShootTracer>> tracers;
+  std::vector<osg::observer_ptr<ShootTracer>> tracers;
+  //osg::observer_ptr<ShootTracer> shootTracer;
+};
 
 } // Soleil
 
