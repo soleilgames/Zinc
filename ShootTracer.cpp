@@ -53,8 +53,14 @@ ShootTracer::~ShootTracer() {}
 void ShootTracer::updateHead(const osg::Vec3 &position,
                              const osg::Vec3 &direction) {
 
-  (*vertices)[numberOfPoints - 2] = position + osg::Vec3(halfWidth, 0.0f, 0.0f);
-  (*vertices)[numberOfPoints - 1] = position - osg::Vec3(halfWidth, 0.0f, 0.0f);
+  const osg::Vec3 min = position + osg::Vec3(halfWidth, 0.0f, 0.0f);
+  const osg::Vec3 max = position - osg::Vec3(halfWidth, 0.0f, 0.0f);
+  for (int i = 0; i < numberOfPoints - 1; i += 2) {
+    (*vertices)[i] = min;
+    (*vertices)[i + 1] = max;
+  }
+  // (*vertices)[numberOfPoints - 2] = position + osg::Vec3(halfWidth, 0.0f, 0.0f);
+  // (*vertices)[numberOfPoints - 1] = position - osg::Vec3(halfWidth, 0.0f, 0.0f);
   this->direction = direction;
   this->direction.normalize();
 }
@@ -68,7 +74,7 @@ void ShootTracer::updateTail() {
   }
   // TODO: Conf speed
   // TODO: Frame rate
-  constexpr float speed = 1.6f;
+  constexpr float speed = 3.6f;
   (*vertices)[numberOfPoints - 2] += direction * speed;
   (*vertices)[numberOfPoints - 1] += direction * speed;
 

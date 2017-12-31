@@ -251,16 +251,23 @@ bool PlayerFlightCameraManipulator::handle(
     static int exp = 0;
 
     const unsigned int id = exp % NumOfExplosions;
-    explosion->setPosition(id,
-                           PlayerNode->getMatrix().getTrans() +
-                               planeOrientationMatrix * osg::Vec3(0, 100, 0));
+    explosion->setPosition(
+        id, targetPosition + planeOrientationMatrix * osg::Vec3(0, 100, 0));
     explosionImpostor[id]->time = 0.0f;
     explosion->computeBound();
     explosion->dirtyBound();
 
     assert(shootTracers->getNumDrawables() >= id);
+
+    const osg::Vec3 tracerStartPoint =
+        targetPosition +
+        planeOrientationMatrix *
+            osg::Vec3(0, 5.0f,
+                      0); // TODO: Workaround to avoid starting point to be
+                          // at the tail, next attach the start point to a
+                          // bone or a node
     tracerUpdater->tracers[id]->updateHead(
-        targetPosition, planeOrientationMatrix * osg::Vec3f(0, 1, 0));
+        tracerStartPoint, planeOrientationMatrix * osg::Vec3f(0, 1, 0));
     ++exp;
 
   } break;
@@ -532,7 +539,7 @@ int main(int // argc
     shootTracers->setEventCallback(tracerUpdater);
     for (int i = 0; i < NumOfExplosions; ++i) {
       osg::ref_ptr<Soleil::ShootTracer> tracer =
-          new Soleil::ShootTracer(100, 0.1f, osg::Vec3(1.0f, 1.0f, 0.0f));
+          new Soleil::ShootTracer(50, 0.1f, osg::Vec3(1.0f, 1.0f, 0.0f));
       shootTracers->addDrawable(tracer);
       tracerUpdater->tracers.push_back(tracer);
     }
