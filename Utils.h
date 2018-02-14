@@ -29,34 +29,99 @@
 
 #include <iostream>
 
+#include "Logger.h"
+
 namespace Soleil {
 
-struct NameVisitor : public osg::NodeVisitor {
-  std::string name;
-  osg::Node *found = nullptr;
+  struct NameVisitor : public osg::NodeVisitor
+  {
+    std::string   name;
+    osg::Node*    found = nullptr;
+    osg::NodePath path;
 
-  NameVisitor(osg::NodeVisitor::TraversalMode mode) : osg::NodeVisitor(mode) {}
-
-  void apply(osg::Node &node) override {
-    std::cout << "==" << node.getName() << "\n";
-    if (node.getName() == name)
-      found = &node;
-    else {
-      traverse(node);
+    NameVisitor(osg::NodeVisitor::TraversalMode mode)
+      : osg::NodeVisitor(mode)
+    {
     }
+
+    void apply(osg::Node& node) override
+    {
+      SOLEIL__LOGGER_DEBUG("Searching for '", name,
+                           "' in node: ", node.getName());
+      if (node.getName() == name) {
+        path  = this->getNodePath();
+        found = &node;
+      } else {
+        traverse(node);
+      }
+    }
+  };
+
+  inline osg::Node* GetNodeByName(osg::Node& root, const std::string& name)
+  {
+    if (root.getName() == name) return &root;
+    NameVisitor v(osg::NodeVisitor::TraversalMode::TRAVERSE_ALL_CHILDREN);
+    v.name = name;
+
+    root.accept(v);
+    return v.found;
   }
-};
 
-osg::Node *GetNodeByName(osg::Node &root, const std::string &name) {
-  if (root.getName() == name)
-    return &root;
-  NameVisitor v(osg::NodeVisitor::TraversalMode::TRAVERSE_ALL_CHILDREN);
-  v.name = name;
+  inline osg::NodePath GetPathByNodeName(osg::Node&         root,
+                                         const std::string& name,
+                                         osg::NodePath*     path = nullptr)
+  {
+    NameVisitor v(osg::NodeVisitor::TraversalMode::TRAVERSE_ALL_CHILDREN);
+    v.name = name;
 
-  root.accept(v);
-  return v.found;
-}
+    root.accept(v);
+    return v.path;
+  }
 
 } // Soleil
+
+template <typename T>
+int
+Sign(T val)
+{
+  return (T(0) < val) - (val < T(0));
+}
+
+template <typename T, typename U>
+T
+mix(T x, T y, U a)
+{
+  return x * (1.0 - a) + y * a;
+}
+
+template <typename T>
+T
+reflect(T incidence, T normal)
+{
+  return normal * (-2.0f * (incidence * normal)) + incidence;
+}
+
+template <typename T>
+T
+Random(T maxValue)
+{
+  return static_cast<T>(rand()) / (static_cast<T>(RAND_MAX / maxValue));
+}
+template <typename T>
+T
+Random(T minValue, T maxValue)
+{
+  //
+  return static_cast<T>(rand() + minValue) /
+         (static_cast<T>(RAND_MAX / maxValue));
+}
+
+inline osg::Vec3
+normalize(const osg::Vec3& node)
+{
+  osg::Vec3 normalized = node;
+  normalized.normalize();
+  return normalized;
+}
 
 #endif /* SOLEIL__UTILS_H_ */

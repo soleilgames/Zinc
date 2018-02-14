@@ -35,12 +35,21 @@
 #include <osgDB/WriteFile>
 #include <osgGA/CameraManipulator>
 #include <osgGA/NodeTrackerManipulator>
+#include <osgParticle/ModularEmitter>
+#include <osgParticle/ModularProgram>
+#include <osgParticle/ParticleSystem>
+#include <osgParticle/ParticleSystemUpdater>
+#include <osgParticle/RadialShooter>
+#include <osgParticle/SectorPlacer>
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
 
 #include <osg/Timer>
 
+#include "EventManager.h"
+#include "GameEvent.h"
 #include "Logger.h"
+#include "SceneManager.h"
 #include "ShootTracer.h"
 #include "SkyBox.h"
 #include "Utils.h"
@@ -62,38 +71,33 @@
 
 // USE_GRAPHICSWINDOW()
 
-osg::Vec3 worldPosition;
-osg::ref_ptr<osg::MatrixTransform> GroupPtr;
-osg::ref_ptr<osg::MatrixTransform> PlayerNode;
-osg::ref_ptr<osg::MatrixTransform> PlaneNode;
+osg::Vec3                                    worldPosition;
+osg::ref_ptr<osg::MatrixTransform>           GroupPtr;
+osg::ref_ptr<osg::MatrixTransform>           PlayerNode;
+osg::ref_ptr<osg::MatrixTransform>           PlaneNode;
 osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
-
-// TODO: In utils file
-/* --- Utils ---*/
-template <typename T> int Sign(T val) { return (T(0) < val) - (val < T(0)); }
-template <typename T, typename U> T mix(T x, T y, U a) {
-  return x * (1.0 - a) + y * a;
-}
-template <typename T> T Random(T maxValue) {
-  return static_cast<T>(rand()) / (static_cast<T>(RAND_MAX / maxValue));
-}
-/* --- Utils ---*/
 
 // TODO: Not here:
 
-class DrawableStateCallback : public osg::Drawable::UpdateCallback {
+class DrawableStateCallback : public osg::Drawable::UpdateCallback
+{
 public:
   float time;
 
 public:
-  DrawableStateCallback(float speed) : time(0.0f), speed(speed) {}
+  DrawableStateCallback(float speed)
+    : time(0.0f)
+    , speed(speed)
+  {
+  }
 
   // virtual void operator()(osg::Node *node, osg::NodeVisitor *nv) {
-  void update(osg::NodeVisitor *, osg::Drawable *d) {
+  void update(osg::NodeVisitor*, osg::Drawable* d)
+  {
 
-    osg::StateAttribute *attribute =
-        d->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXGEN);
-    osg::TexGen *texgen = dynamic_cast<osg::TexGen *>(attribute);
+    osg::StateAttribute* attribute =
+      d->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXGEN);
+    osg::TexGen* texgen = dynamic_cast<osg::TexGen*>(attribute);
     // if (texgen) {
     time += 1.00f / speed; // TODO: Framerate
     texgen->getPlane(osg::TexGen::R)[3] = time;
@@ -106,65 +110,87 @@ private:
   float speed;
 };
 
-osg::ref_ptr<osg::Geode> shootTracers = new osg::Geode;
-osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
+osg::ref_ptr<osg::Geode>     shootTracers = new osg::Geode;
+osg::ref_ptr<osg::Billboard> explosion    = new osg::Billboard;
 class DrawableStateCallback;
 std::vector<osg::ref_ptr<DrawableStateCallback>> explosionImpostor;
-constexpr int NumOfExplosions = 150;
-osg::ref_ptr<Soleil::ShootTracerCallback> tracerUpdater =
-    new Soleil::ShootTracerCallback;
+constexpr int                                    NumOfExplosions = 150;
+osg::ref_ptr<Soleil::ShootTracerCallback>        tracerUpdater =
+  new Soleil::ShootTracerCallback;
 //
 
 /* --- PlayerFlightCameraManipulator */
-class PlayerFlightCameraManipulator : public osgGA::CameraManipulator {
+class PlayerFlightCameraManipulator : public osgGA::CameraManipulator
+{
 public:
-  PlayerFlightCameraManipulator(osg::MatrixTransform *target);
+  PlayerFlightCameraManipulator(osg::MatrixTransform* target);
 
-  bool handle(const osgGA::GUIEventAdapter &event,
-              osgGA::GUIActionAdapter &action) override;
+  bool handle(const osgGA::GUIEventAdapter& event,
+              osgGA::GUIActionAdapter&      action) override;
 
 public:
-  void setByMatrix(const osg::Matrixd &matrix) override;
-  void setByInverseMatrix(const osg::Matrixd &matrix) override;
+  void setByMatrix(const osg::Matrixd& matrix) override;
+  void setByInverseMatrix(const osg::Matrixd& matrix) override;
   osg::Matrixd getMatrix() const override;
   osg::Matrixd getInverseMatrix() const override;
 
 private:
-  osg::MatrixTransform *target_;
-  osg::Vec3 offset;        ///< Camera Offset to the target
-  osg::Quat planeAttitude; ///< Target orientation (z axis)
-  float planePitch;        ///< Model pitch
-  double previousTime;     ///< Used to compute delta
+  osg::MatrixTransform* target_;
+  osg::Vec3             offset;        ///< Camera Offset to the target
+  osg::Quat             planeAttitude; ///< Target orientation (z axis)
+  float                 planePitch;    ///< Model pitch
+  double                previousTime;  ///< Used to compute delta
 
 private:
-  osg::Quat cameraAttitude; /// Used to slerp the rotation to the target
+  osg::Quat   cameraAttitude; /// Used to slerp the rotation to the target
   osg::Matrix viewMatrix;
+
+private:
+  bool userControl;
 };
 
 PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
-    osg::MatrixTransform *target)
-    : target_(target), offset(0, -10, 0), planeAttitude(), planePitch(0.0f),
-      previousTime(-1.0) {}
+  osg::MatrixTransform* target)
+  : target_(target)
+  , offset(0, -10, 0)
+  , planeAttitude()
+  , planePitch(0.0f)
+  , previousTime(-1.0)
+  , userControl(true)
+{
+}
 
-void PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd &matrix) {
+void
+PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd& matrix)
+{
   assert(false && "// TODO: ");
 }
 
-void PlayerFlightCameraManipulator::setByInverseMatrix(
-    const osg::Matrixd & /*matrix*/) {
+void
+PlayerFlightCameraManipulator::setByInverseMatrix(
+  const osg::Matrixd& /*matrix*/)
+{
   assert(false && "// TODO: ");
 }
 
-osg::Matrixd PlayerFlightCameraManipulator::getMatrix() const {
+osg::Matrixd
+PlayerFlightCameraManipulator::getMatrix() const
+{
   return osg::Matrix::inverse(viewMatrix);
 }
 
-osg::Matrixd PlayerFlightCameraManipulator::getInverseMatrix() const {
+osg::Matrixd
+PlayerFlightCameraManipulator::getInverseMatrix() const
+{
   return viewMatrix;
 }
 
-bool PlayerFlightCameraManipulator::handle(
-    const osgGA::GUIEventAdapter &event, osgGA::GUIActionAdapter & /*action*/) {
+bool
+PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
+                                      osgGA::GUIActionAdapter& /*action*/)
+{
+  if (userControl == false) return false;
+
   const float x = event.getXnormalized();
   const float y = event.getYnormalized();
 
@@ -172,7 +198,7 @@ bool PlayerFlightCameraManipulator::handle(
     previousTime = event.getTime();
   }
   const double delta = event.getTime() - previousTime;
-  previousTime = event.getTime();
+  previousTime       = event.getTime();
 
   ///////////////////////////////////////////////////
   // // TODO: Work in Progress			   //
@@ -182,10 +208,10 @@ bool PlayerFlightCameraManipulator::handle(
   // 4. Make the camera follow the plane rotation? //
   ///////////////////////////////////////////////////
 
-  constexpr float Min = 0.1f;
+  constexpr float Min   = 0.1f;
   constexpr float Speed = 12.5f;
   // constexpr float Speed = 0.0f;
-  constexpr float RollSpeed = 1.0f;
+  constexpr float RollSpeed  = 1.0f;
   constexpr float PitchSpeed = 0.005f;
 
   /////////////////////////////////////////////////
@@ -195,14 +221,14 @@ bool PlayerFlightCameraManipulator::handle(
   constexpr float MaxPitch = 1.256637061f; // 80% of PI/2
 
   osg::Matrix planeOrientation;
-  float planeRoll = 0.0f;
+  float       planeRoll = 0.0f;
   planeRoll =
-      RollSpeed * atan2(Sign(x) * ExponentialEaseIn(osg::absolute(x)),
-                        (osg::absolute(y) > Min) ? osg::absolute(y) : Min);
+    RollSpeed * atan2(Sign(x) * ExponentialEaseIn(osg::absolute(x)),
+                      (osg::absolute(y) > Min) ? osg::absolute(y) : Min);
 
   planePitch += (osg::absolute(y) > Min)
-                    ? PitchSpeed * Sign(y) * ExponentialEaseIn(osg::absolute(y))
-                    : 0.0f;
+                  ? PitchSpeed * Sign(y) * ExponentialEaseIn(osg::absolute(y))
+                  : 0.0f;
   planePitch = osg::clampBetween(planePitch, -MaxPitch, MaxPitch);
 
   osg::Quat rotation;
@@ -220,13 +246,29 @@ bool PlayerFlightCameraManipulator::handle(
   // Move the ROOT node //
   ////////////////////////
   const osg::Matrix planeOrientationMatrix =
-      osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix);
+    osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix);
   const osg::Matrix matrix =
-      osg::Matrix::translate(planeOrientationMatrix *
-                             osg::Vec3(0.0f, Speed * delta, 0.0f)) *
-      PlayerNode->getMatrix();
+    osg::Matrix::translate(planeOrientationMatrix *
+                           osg::Vec3(0.0f, Speed * delta, 0.0f)) *
+    PlayerNode->getMatrix();
 
-  PlayerNode->setMatrix(matrix);
+  // --- Collision test -----
+  const osg::Vec3 currentPosition = PlayerNode->getMatrix().getTrans();
+  const osg::Vec3 nextPosition    = matrix.getTrans();
+  osg::Vec3       collisionNormal;
+
+  if (Soleil::SceneManager::SegmentCollision(currentPosition, nextPosition,
+                                             &collisionNormal)) {
+
+    Soleil::EventManager::Emit(std::make_shared<Soleil::EventDestructObject>(
+      Soleil::ConstHash("PlayerPlane")));
+    Soleil::EventManager::Emit(std::make_shared<Soleil::EventGameOver>());
+    Soleil::EventManager::Delay(
+      3.0, std::make_shared<Soleil::EventLoadLevel>("first"));
+    userControl = false;
+  } else {
+    PlayerNode->setMatrix(matrix);
+  }
 
   ////////////////////////////
   // Update the View Matrix //
@@ -234,43 +276,43 @@ bool PlayerFlightCameraManipulator::handle(
   constexpr float SlerpSpeed = 3.0f;
 
   const osg::Vec3 targetPosition = PlayerNode->getMatrix().getTrans();
-  const osg::Vec3 center = targetPosition;
-  const osg::Vec3 up = osg::Vec3(0, 0, 1);
-  osg::Quat toRotation;
+  const osg::Vec3 center         = targetPosition;
+  const osg::Vec3 up             = osg::Vec3(0, 0, 1);
+  osg::Quat       toRotation;
   toRotation.set(PlaneNode->getMatrix());
   cameraAttitude.slerp(SlerpSpeed * delta, cameraAttitude, toRotation);
   const osg::Vec3 eye = targetPosition + (cameraAttitude * offset);
-  viewMatrix = osg::Matrix::lookAt(eye, center, up);
+  viewMatrix          = osg::Matrix::lookAt(eye, center, up);
 
   /////////////////////
   // Test click-fire //
   /////////////////////
   switch (event.getEventType()) {
-  case osgGA::GUIEventAdapter::EventType::PUSH: {
-    // TODO: Every x frames
-    static int exp = 0;
+    case osgGA::GUIEventAdapter::EventType::PUSH: {
+      // TODO: Every x frames
+      static int exp = 0;
 
-    const unsigned int id = exp % NumOfExplosions;
-    explosion->setPosition(
+      const unsigned int id = exp % NumOfExplosions;
+      explosion->setPosition(
         id, targetPosition + planeOrientationMatrix * osg::Vec3(0, 100, 0));
-    explosionImpostor[id]->time = 0.0f;
-    explosion->computeBound();
-    explosion->dirtyBound();
+      explosionImpostor[id]->time = 0.0f;
+      explosion->computeBound();
+      explosion->dirtyBound();
 
-    assert(shootTracers->getNumDrawables() >= id);
+      assert(shootTracers->getNumDrawables() >= id);
 
-    const osg::Vec3 tracerStartPoint =
+      const osg::Vec3 tracerStartPoint =
         targetPosition +
         planeOrientationMatrix *
-            osg::Vec3(0, 5.0f,
-                      0); // TODO: Workaround to avoid starting point to be
-                          // at the tail, next attach the start point to a
-                          // bone or a node
-    tracerUpdater->tracers[id]->updateHead(
+          osg::Vec3(0, 5.0f,
+                    0); // TODO: Workaround to avoid starting point to be
+                        // at the tail, next attach the start point to a
+                        // bone or a node
+      tracerUpdater->tracers[id]->updateHead(
         tracerStartPoint, planeOrientationMatrix * osg::Vec3f(0, 1, 0));
-    ++exp;
+      ++exp;
 
-  } break;
+    } break;
   }
 
   return true;
@@ -281,13 +323,14 @@ bool PlayerFlightCameraManipulator::handle(
 /* --- Create texture 3D from a list of texture 2D --- */
 
 osg::ref_ptr<osg::StateSet>
-convertImageListTo3Dstate(std::vector<std::string> files) {
+convertImageListTo3Dstate(std::vector<std::string> files)
+{
   assert(files.size() > 0);
 
   std::vector<osg::ref_ptr<osg::Image>> imageList;
 
   osg::ref_ptr<osg::Image> StandardImage;
-  for (const auto &file : files) {
+  for (const auto& file : files) {
     osg::ref_ptr<osg::Image> image = osgDB::readRefImageFile(file);
     assert(image);
 
@@ -348,8 +391,8 @@ convertImageListTo3Dstate(std::vector<std::string> files) {
   stateset->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
 
   osg::ref_ptr<osg::StateAttribute> blend =
-      new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
-                         osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
+    new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
+                       osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
   stateset->setAttributeAndModes(blend, osg::StateAttribute::ON);
 
   // stateset->setAttribute(
@@ -358,15 +401,20 @@ convertImageListTo3Dstate(std::vector<std::string> files) {
   return stateset;
 }
 
-class UpdateStateCallback : public osg::NodeCallback {
+class UpdateStateCallback : public osg::NodeCallback
+{
 public:
-  UpdateStateCallback(osg::StateSet *stateset) : stateset(stateset) {}
+  UpdateStateCallback(osg::StateSet* stateset)
+    : stateset(stateset)
+  {
+  }
 
-  virtual void operator()(osg::Node *node, osg::NodeVisitor *nv) {
+  virtual void operator()(osg::Node* node, osg::NodeVisitor* nv)
+  {
 
-    osg::StateAttribute *attribute =
-        stateset->getTextureAttribute(0, osg::StateAttribute::TEXGEN);
-    osg::TexGen *texgen = dynamic_cast<osg::TexGen *>(attribute);
+    osg::StateAttribute* attribute =
+      stateset->getTextureAttribute(0, osg::StateAttribute::TEXGEN);
+    osg::TexGen* texgen = dynamic_cast<osg::TexGen*>(attribute);
     // if (texgen) {
     texgen->getPlane(osg::TexGen::R)[3] += 1.00f / 17.0f; // TODO: Framerate
     //}
@@ -375,17 +423,19 @@ public:
   }
 
 private:
-  osg::StateSet *stateset;
+  osg::StateSet* stateset;
 };
 
 /* --- Create texture 3D from a list of texture 2D --- */
 
 /* --- Explosion Impostor --- */
 
-osg::ref_ptr<osg::Geometry> createExplosionQuad() {
+osg::ref_ptr<osg::Geometry>
+createExplosionQuad()
+{
   osg::ref_ptr<osg::Geometry> quad = osg::createTexturedQuadGeometry(
-      osg::Vec3(-0.5f, 0.0f, -0.5f), osg::Vec3(1.0f, 0.0f, 0.0f),
-      osg::Vec3(0.0f, 0.0f, 1.0f));
+    osg::Vec3(-0.5f, 0.0f, -0.5f), osg::Vec3(1.0f, 0.0f, 0.0f),
+    osg::Vec3(0.0f, 0.0f, 1.0f));
 
 #if 0
   osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
@@ -413,17 +463,19 @@ osg::ref_ptr<osg::Geometry> createExplosionQuad() {
 
 /* --- Explosion Impostor --- */
 
-static osg::ref_ptr<osg::MatrixTransform> createPlayerGraph() {
+static osg::ref_ptr<osg::MatrixTransform>
+createPlayerGraph()
+{
   osg::ref_ptr<osg::MatrixTransform> group = new osg::MatrixTransform;
   osg::ref_ptr<osg::Node> cessna = osgDB::readNodeFile("../media/Player.osgt");
-  osg::ref_ptr<osg::Node> axes = osgDB::readNodeFile("../media/axes.osgt");
+  osg::ref_ptr<osg::Node> axes   = osgDB::readNodeFile("../media/axes.osgt");
   assert(cessna.get() != nullptr && "Root is null");
   group->addChild(cessna);
   // group->addChild(axes);
 
   // TODO: FIXME the osgexport do not export camera node as a node alone
-  osg::MatrixTransform *camNode = dynamic_cast<osg::MatrixTransform *>(
-      Soleil::GetNodeByName(*cessna, "Camera"));
+  osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
+    Soleil::GetNodeByName(*cessna, "Camera"));
   assert(camNode); // TODO: Better error system
 
   CameraBase = new osg::PositionAttitudeTransform;
@@ -437,64 +489,145 @@ static osg::ref_ptr<osg::MatrixTransform> createPlayerGraph() {
   return group;
 }
 
-#if 0
-static osg::ref_ptr<osg::MatrixTransform> createAxisPath(int size) {
-  assert(size >= 0);
+/* --- Explosion with particles --- */
+static osg::ref_ptr<osgParticle::ParticleSystem>
+CreateExplosionPS(osg::Group& parent)
+{
+  constexpr float                           scale = 10.0f;
+  osg::ref_ptr<osgParticle::ParticleSystem> ps =
+    new osgParticle::ParticleSystem;
 
-  osg::ref_ptr<osg::MatrixTransform> root = new osg::MatrixTransform;
-  osg::ref_ptr<osg::Node> child = osgDB::readNodeFile("../media/axes.osgt");
-  for (int i = 0; i < size; ++i) {
-    osg::ref_ptr<osg::MatrixTransform> target = new osg::MatrixTransform;
-    target->addChild(child);
-    target->setMatrix(osg::Matrix::translate(osg::Vec3(
-                          0.0f, static_cast<float>(i) * 5.0f - 20.0f, 0.0f)) *
-                      osg::Matrix::scale(osg::Vec3(10.0f, 10.0f, 10.0f)));
+  ps->setDefaultAttributes("Images/smoke.rgb", false, false);
 
-    root->addChild(target);
-  }
-  return root;
+  float radius  = 0.4f * scale;
+  float density = 1.2f; // 1.0kg/m^3
+
+  auto& defaultParticleTemplate = ps->getDefaultParticleTemplate();
+  defaultParticleTemplate.setLifeTime(1.0 + 0.1 * scale);
+  defaultParticleTemplate.setSizeRange(osgParticle::rangef(0.75f, 3.0f));
+  defaultParticleTemplate.setAlphaRange(osgParticle::rangef(0.1f, 1.0f));
+  defaultParticleTemplate.setColorRange(osgParticle::rangev4(
+    osg::Vec4(1.0f, 0.8f, 0.2f, 1.0f), osg::Vec4(1.0f, 0.4f, 0.1f, 0.0f)));
+  defaultParticleTemplate.setRadius(radius);
+  defaultParticleTemplate.setMass(density * radius * radius * radius * osg::PI *
+                                  4.0f / 3.0f);
+
+  // TODO: Try         _program = new osgParticle::FluidProgram;
+
+  osg::ref_ptr<osgParticle::ModularProgram> program =
+    new osgParticle::ModularProgram;
+  program->setParticleSystem(ps);
+
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+  geode->addDrawable(ps);
+  parent.addChild(program);
+  parent.addChild(geode);
+
+  // parent->addChild(parent2);
+
+  osg::ref_ptr<osgParticle::ParticleSystemUpdater> updater =
+    new osgParticle::ParticleSystemUpdater;
+  updater->addParticleSystem(ps);
+  parent.addChild(updater);
+
+  // MeshSetLineMode(geometry);
+
+  return ps;
 }
-#endif
 
-int main(int // argc
-         ,
-         char *const // argv
-             []) {
+static osg::ref_ptr<osgParticle::Emitter>
+CreateDustEmitter(const osg::Vec3& position)
+{
+  constexpr float scale = 0.4f;
 
-  osg::ref_ptr<osg::Group> root = new osg::Group();
+  osg::ref_ptr<osgParticle::RandomRateCounter> rrc =
+    new osgParticle::RandomRateCounter;
+  rrc->setRateRange(300, 300);
 
+  osg::ref_ptr<osgParticle::ModularEmitter> emitter =
+    new osgParticle::ModularEmitter;
+  // emitter->setParticleSystem(ps);
+  emitter->setCounter(rrc);
+  emitter->setEndless(false);
+  emitter->setLifeTime(.10f);
+
+  osg::ref_ptr<osgParticle::RadialShooter> shooter =
+    new osgParticle::RadialShooter;
+  osg::ref_ptr<osgParticle::SectorPlacer> placer =
+    new osgParticle::SectorPlacer;
+
+  emitter->setPlacer(placer);
+  emitter->setShooter(shooter);
+
+  placer->setCenter(position);
+  placer->setRadiusRange(0.0f * scale, 0.25f * scale);
+
+  shooter->setThetaRange(0.0f, osg::PI * 2.0f);
+  shooter->setInitialSpeedRange(1.0f * scale, 10.0f * scale);
+
+  return emitter;
+}
+
+osg::ref_ptr<osgParticle::Emitter>
+CreateExplosionEmitter()
+{
+  constexpr float scale = 1.0f;
+
+  osg::ref_ptr<osgParticle::RandomRateCounter> rrc =
+    new osgParticle::RandomRateCounter;
+  rrc->setRateRange(800, 1000);
+
+  osg::ref_ptr<osgParticle::ModularEmitter> emitter =
+    new osgParticle::ModularEmitter;
+  // emitter->setParticleSystem(ps);
+  emitter->setCounter(rrc);
+  emitter->setEndless(false);
+  emitter->setLifeTime(.10f);
+
+  osg::ref_ptr<osgParticle::RadialShooter> shooter =
+    new osgParticle::RadialShooter;
+  osg::ref_ptr<osgParticle::SectorPlacer> placer =
+    new osgParticle::SectorPlacer;
+
+  emitter->setPlacer(placer);
+  emitter->setShooter(shooter);
+
+  // placer->setCenter(osg::Vec3(0, 0, 60));
+  placer->setRadiusRange(0.0f * scale, 0.25f * scale);
+
+  shooter->setThetaRange(0.0f, osg::PI * 2.0f);
+  shooter->setInitialSpeedRange(1.0f * scale, 10.0f * scale);
+
+  return emitter;
+}
+
+/* --- Explosion with particles --- */
+
+void
+FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
+{
   auto plane = createPlayerGraph();
   root->addChild(plane);
 
   ///////////////////////
   // Setting the Scene //
   ///////////////////////
-
+  // Soleil::SceneManager::Init(root);
   osg::ref_ptr<osg::Node> skycube =
-      osgDB::readNodeFile("../media/ZincSkybox.osgt");
+    osgDB::readNodeFile("../media/ZincSkybox.osgt");
   assert(skycube);
   osg::ref_ptr<SkyBox> skybox = new SkyBox;
   skybox->addChild(skycube);
   root->addChild(skybox);
 
-// root->addChild(createAxisPath(10));
+  // root->addChild(createAxisPath(10));
 
-#if 0
   root->addChild(osgDB::readNodeFile("../media/ZincIslands.obj"));
-#elif 1
-  root->addChild(osgDB::readNodeFile("../media/islands.3ds.osgt"));
-#elif 0
-  root->addChild(osgDB::readNodeFile("../media/islands.osgt"));
-
-  osg::ref_ptr<osg::Node> testNode =
-      osgDB::readNodeFile("../media/ZincTest.obj");
-  assert(testNode);
-  osg::ref_ptr<osg::MatrixTransform> testRoot = new osg::MatrixTransform;
-  testRoot->addChild(testNode);
-
-  root->addChild(testRoot);
-  osgDB::writeNodeFile(*testRoot, "../media/ZincTest.osgt");
-#endif
+  osg::ref_ptr<osg::Group> model =
+    osgDB::readNodeFile("../media/islands.3ds.osgt")->asGroup();
+  assert(model);
+  root->addChild(model);
+  Soleil::SceneManager::Init(model);
 
   /////////////////////////////
   // ----------------------- //
@@ -503,7 +636,7 @@ int main(int // argc
   // osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
   explosion->setMode(osg::Billboard::POINT_ROT_EYE);
   explosion->setDataVariance(osg::Object::DataVariance::DYNAMIC);
-  osg::StateSet *ss = explosion->getOrCreateStateSet();
+  osg::StateSet* ss = explosion->getOrCreateStateSet();
   ss->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
   // osg::ref_ptr<osg::StateAttribute> blend =
   //   new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
@@ -512,15 +645,16 @@ int main(int // argc
 
   osg::ref_ptr<osg::Geometry> ex = createExplosionQuad();
   for (int i = 0; i < NumOfExplosions; ++i) {
-    osg::ref_ptr<osg::Geometry> dup = dynamic_cast<osg::Geometry *>(
-        ex->clone(osg::CopyOp::DEEP_COPY_STATESETS |
-                  osg::CopyOp::DEEP_COPY_STATEATTRIBUTES));
+    osg::ref_ptr<osg::Geometry> dup = dynamic_cast<osg::Geometry*>(
+      ex->clone(osg::CopyOp::DEEP_COPY_STATESETS |
+                osg::CopyOp::DEEP_COPY_STATEATTRIBUTES));
 
     osg::ref_ptr<DrawableStateCallback> cb =
-        new DrawableStateCallback(Random(50.0f) + 50.0f);
+      new DrawableStateCallback(Random(50.0f) + 50.0f);
     explosionImpostor.push_back(cb);
     dup->setUpdateCallback(cb);
-    explosion->addDrawable(dup, osg::Vec3(0.0f, (float)i, 1.0f));
+    // TODO: -1000 in z to avoid to see them. Find another solution (a pool)
+    explosion->addDrawable(dup, osg::Vec3(0.0f, (float)i, -1000.0f));
   }
 
   // explosion->setUpdateCallback(new UpdateStateCallback(ex->getStateSet()));
@@ -533,13 +667,13 @@ int main(int // argc
     shootTracers->getOrCreateStateSet()->setMode(GL_BLEND,
                                                  osg::StateAttribute::ON);
     shootTracers->getOrCreateStateSet()->setRenderingHint(
-        osg::StateSet::TRANSPARENT_BIN);
+      osg::StateSet::TRANSPARENT_BIN);
 
     tracerUpdater = new Soleil::ShootTracerCallback;
     shootTracers->setEventCallback(tracerUpdater);
     for (int i = 0; i < NumOfExplosions; ++i) {
       osg::ref_ptr<Soleil::ShootTracer> tracer =
-          new Soleil::ShootTracer(50, 0.1f, osg::Vec3(1.0f, 1.0f, 0.0f));
+        new Soleil::ShootTracer(50, 0.1f, osg::Vec3(1.0f, 1.0f, 0.0f));
       shootTracers->addDrawable(tracer);
       tracerUpdater->tracers.push_back(tracer);
     }
@@ -547,37 +681,89 @@ int main(int // argc
     root->addChild(shootTracers);
   }
 
-  osgViewer::Viewer viewer;
-  viewer.setSceneData(root);
+  // --------------------------------------------
+  // Particle Emitter
+  /* --- Explosion with particles --- */
+  osg::ref_ptr<osgParticle::ParticleSystem> ps = CreateExplosionPS(*root);
+  Soleil::SceneManager::RegisterParticleSystem(0, ps);
+
+  Soleil::EventManager::Enroll(
+    Soleil::EventDestructObject::Type(), [root](Soleil::Event& /*e*/) {
+      // Just destroy the plane player for now
+      osg::Vec3 point = PlayerNode->getBound().center();
+      Soleil::SceneManager::AddParticleEmitter(0, CreateDustEmitter(point));
+      // Soleil::SceneManager::AddParticleEmitter(0, CreateExplosionEmitter());
+
+      root->removeChild(PlayerNode);
+      // TODO: I whish to have a triangle outpouring
+    });
 
   ///////////////////////////////////////////
   // Setting the player camera manipulator //
   ///////////////////////////////////////////
-  PlayerNode = plane;
+  PlayerNode                                 = plane;
   osg::ref_ptr<osg::MatrixTransform> centerg = new osg::MatrixTransform;
   centerg->addChild(osgDB::readNodeFile("../media/axes.osgt"));
   centerg->setMatrix(
-      osg::Matrix::translate(PlayerNode->computeBound().center()));
+    osg::Matrix::translate(PlayerNode->computeBound().center()));
   PlayerNode->addChild(centerg);
 
-  PlaneNode = dynamic_cast<osg::MatrixTransform *>(
-      Soleil::GetNodeByName(*plane.get(), "Plane"));
+  PlaneNode = dynamic_cast<osg::MatrixTransform*>(
+    Soleil::GetNodeByName(*plane.get(), "Plane"));
   assert(PlaneNode);
-  osg::MatrixTransform *camNode = dynamic_cast<osg::MatrixTransform *>(
-      Soleil::GetNodeByName(*plane.get(), "NewCamera"));
+  osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
+    Soleil::GetNodeByName(*plane.get(), "NewCamera"));
   assert(camNode); // TODO: Better error system
 
   osg::ref_ptr<PlayerFlightCameraManipulator> playerManipulator =
-      new PlayerFlightCameraManipulator(camNode);
+    new PlayerFlightCameraManipulator(camNode);
 
   viewer.setCameraManipulator(playerManipulator);
-  viewer.addEventHandler(new osgViewer::StatsHandler());
 
   /////////////////////////////////////////////////
   // ------------------------------------------- //
   /////////////////////////////////////////////////
+}
+
+int
+main(int // argc
+     ,
+     char* const // argv
+       [])
+{
+
+  osg::ref_ptr<osg::Group> root = new osg::Group();
+  osgViewer::Viewer        viewer;
+  Soleil::EventManager::Init();
+
+  Soleil::EventManager::Enroll(
+    Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
+      Soleil::EventLoadLevel* event = static_cast<Soleil::EventLoadLevel*>(&e);
+
+      root->removeChildren(0, root->getNumChildren());
+      // TODO: Clear Event Queue
+      FirstLevelSetup(root, viewer);
+    });
+
+  // --------------------------------------------
+  // Attach the scene
+  viewer.addEventHandler(new osgViewer::StatsHandler());
+  viewer.setSceneData(root);
 
   viewer.realize();
 
-  return viewer.run();
+  Soleil::EventManager::Emit(std::make_shared<Soleil::EventLoadLevel>("first"));
+
+  // return viewer.run();
+  double previousTime = viewer.getFrameStamp()->getSimulationTime();
+  while (!viewer.done()) {
+    viewer.frame();
+
+    // Update events
+    double deltaTime =
+      viewer.getFrameStamp()->getSimulationTime() - previousTime;
+    Soleil::EventManager::ProcessEvents(deltaTime);
+    previousTime = viewer.getFrameStamp()->getSimulationTime();
+  }
+  return 0;
 }

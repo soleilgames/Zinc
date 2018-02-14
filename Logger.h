@@ -25,6 +25,8 @@
 #include <cassert>
 #include <string>
 
+#include <osg/io_utils>
+
 namespace Soleil {
 
   class Logger
