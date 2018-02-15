@@ -23,6 +23,8 @@
 
 #include "AlienCraft.h"
 
+#include "EventManager.h"
+#include "GameEvent.h"
 #include "Logger.h"
 #include "SceneManager.h"
 #include "Utils.h"
@@ -35,7 +37,7 @@ namespace Soleil {
     , friction(0.00f) // No friction
     , mass(1.0f)
     , maxSpeed(4.0f)
-    , maxForce(0.1f)
+    , maxForce(1.0f)
     , previousTime(0.0f)
   {
   }
@@ -75,14 +77,25 @@ namespace Soleil {
       velocity.z() *= std::pow(friction * mass, deltaTime);
     }
 
-    // node->setMatrix(node->getMatrix() *
-    //                 osg::Matrix::translate(velocity * deltaTime));
-
     osg::Quat q;
     q.makeRotate(osg::Vec3(0, 1, 0), velocity);
     osg::Matrix m = node->getMatrix();
     m.setRotate(q);
-    node->setMatrix(m * osg::Matrix::translate(velocity * deltaTime));
+    // node->setMatrix(m * osg::Matrix::translate(velocity * deltaTime));
+    m *= osg::Matrix::translate(velocity * deltaTime);
+
+    const osg::Vec3 nextPosition = m.getTrans();
+    osg::Vec3       collisionNormal;
+
+    if (Soleil::SceneManager::SegmentCollision(
+          node->getMatrix().getTrans(), nextPosition, &collisionNormal)) {
+
+      osg::NodePath p = visitor->getNodePath();
+      Soleil::EventManager::Emit(
+        std::make_shared<Soleil::EventDestructObject>(p));
+    } else {
+      node->setMatrix(m);
+    }
 
     previousTime = visitor->getFrameStamp()->getSimulationTime();
     return traverse(object, data);

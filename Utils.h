@@ -78,6 +78,16 @@ namespace Soleil {
     return v.path;
   }
 
+  inline std::string toName(const osg::Node& node)
+  {
+    std::string name =
+      node.libraryName() + std::string("::") + node.className();
+    if (not node.getName().empty()) {
+      name += ": " + node.getName();
+    }
+    return name;
+  }
+
 } // Soleil
 
 template <typename T>

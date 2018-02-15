@@ -1,7 +1,7 @@
 
 #include "EventManager.h"
 
-#include "SceneManager.h" // For ObjectID
+#include <osg/Node>
 #include "stringutils.h"
 
 namespace Soleil {
@@ -15,13 +15,13 @@ namespace Soleil {
     }
 
   public:
-    EventDestructObject(ObjectID objectId)
+    EventDestructObject(osg::NodePath pathToObject)
       : Event(Type())
-      , objectId(objectId)
+      , object(pathToObject)
     {
     }
 
-    ObjectID objectId;
+    osg::NodePath object;
   };
 
   class EventGameOver : public Event

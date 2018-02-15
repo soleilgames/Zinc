@@ -34,7 +34,9 @@
 #include <osgDB/Registry>
 #include <osgDB/WriteFile>
 #include <osgGA/CameraManipulator>
+#include <osgGA/KeySwitchMatrixManipulator>
 #include <osgGA/NodeTrackerManipulator>
+#include <osgGA/TrackballManipulator>
 #include <osgParticle/ModularEmitter>
 #include <osgParticle/ModularProgram>
 #include <osgParticle/ParticleSystem>
@@ -43,9 +45,6 @@
 #include <osgParticle/SectorPlacer>
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
-#include <osgGA/KeySwitchMatrixManipulator>
-#include <osgGA/NodeTrackerManipulator>
-#include <osgGA/TrackballManipulator>
 
 #include <osg/Timer>
 
@@ -167,14 +166,14 @@ PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
 void
 PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd& matrix)
 {
-  //assert(false && "// TODO: ");
+  // assert(false && "// TODO: ");
 }
 
 void
 PlayerFlightCameraManipulator::setByInverseMatrix(
   const osg::Matrixd& /*matrix*/)
 {
-  //assert(false && "// TODO: ");
+  // assert(false && "// TODO: ");
 }
 
 osg::Matrixd
@@ -265,7 +264,7 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
                                              &collisionNormal)) {
 
     Soleil::EventManager::Emit(std::make_shared<Soleil::EventDestructObject>(
-      Soleil::ConstHash("PlayerPlane")));
+      Soleil::SceneManager::GetNodePath(Soleil::ConstHash("Player"))));
     Soleil::EventManager::Emit(std::make_shared<Soleil::EventGameOver>());
     Soleil::EventManager::Delay(
       3.0, std::make_shared<Soleil::EventLoadLevel>("first"));
@@ -693,13 +692,26 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   Soleil::SceneManager::RegisterParticleSystem(0, ps);
 
   Soleil::EventManager::Enroll(
-    Soleil::EventDestructObject::Type(), [root](Soleil::Event& /*e*/) {
-      // Just destroy the plane player for now
-      osg::Vec3 point = PlayerNode->getBound().center();
-      Soleil::SceneManager::AddParticleEmitter(0, CreateDustEmitter(point));
-      // Soleil::SceneManager::AddParticleEmitter(0, CreateExplosionEmitter());
+    Soleil::EventDestructObject::Type(), [root](Soleil::Event& e) {
+      Soleil::EventDestructObject* event =
+        static_cast<Soleil::EventDestructObject*>(&e);
 
-      root->removeChild(PlayerNode);
+      // Add an explosion at the center point
+      osg::Vec3 point =
+        osg::Vec3(1, 1, 1) * osg::computeLocalToWorld(event->object);
+      Soleil::SceneManager::AddParticleEmitter(0, CreateDustEmitter(point));
+
+      // Remove from the first group
+      auto revit = event->object.rbegin();
+      auto child = revit;
+      ++revit; // His parent;
+      while (revit != event->object.rend()) {
+        if ((*revit)->asGroup()) {
+          (*revit)->asGroup()->removeChild(*child);
+        }
+        child = revit;
+        ++revit;
+      }
       // TODO: I whish to have a triangle outpouring
     });
 
@@ -722,7 +734,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   osg::ref_ptr<PlayerFlightCameraManipulator> playerManipulator =
     new PlayerFlightCameraManipulator(camNode);
-    // viewer.setCameraManipulator(playerManipulator);
+  // viewer.setCameraManipulator(playerManipulator);
   osg::ref_ptr<osgGA::KeySwitchMatrixManipulator> ks =
     new osgGA::KeySwitchMatrixManipulator;
   ks->addMatrixManipulator(osgGA::GUIEventAdapter::KeySymbol::KEY_F11, "Flight",
@@ -730,9 +742,6 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   ks->addMatrixManipulator(osgGA::GUIEventAdapter::KeySymbol::KEY_F12, "Free",
                            new osgGA::TrackballManipulator);
   viewer.setCameraManipulator(ks);
-
-
-  
 
   /////////////////////////////////////////////////
   // ------------------------------------------- //
