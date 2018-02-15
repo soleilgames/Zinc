@@ -43,9 +43,13 @@
 #include <osgParticle/SectorPlacer>
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
+#include <osgGA/KeySwitchMatrixManipulator>
+#include <osgGA/NodeTrackerManipulator>
+#include <osgGA/TrackballManipulator>
 
 #include <osg/Timer>
 
+#include "AlienCraft.h"
 #include "EventManager.h"
 #include "GameEvent.h"
 #include "Logger.h"
@@ -163,14 +167,14 @@ PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
 void
 PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd& matrix)
 {
-  assert(false && "// TODO: ");
+  //assert(false && "// TODO: ");
 }
 
 void
 PlayerFlightCameraManipulator::setByInverseMatrix(
   const osg::Matrixd& /*matrix*/)
 {
-  assert(false && "// TODO: ");
+  //assert(false && "// TODO: ");
 }
 
 osg::Matrixd
@@ -486,6 +490,7 @@ createPlayerGraph()
   CameraBase->addChild(newCamNode);
   group->addChild(CameraBase);
 
+  group->setName("Player");
   return group;
 }
 
@@ -717,12 +722,43 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   osg::ref_ptr<PlayerFlightCameraManipulator> playerManipulator =
     new PlayerFlightCameraManipulator(camNode);
+    // viewer.setCameraManipulator(playerManipulator);
+  osg::ref_ptr<osgGA::KeySwitchMatrixManipulator> ks =
+    new osgGA::KeySwitchMatrixManipulator;
+  ks->addMatrixManipulator(osgGA::GUIEventAdapter::KeySymbol::KEY_F11, "Flight",
+                           playerManipulator);
+  ks->addMatrixManipulator(osgGA::GUIEventAdapter::KeySymbol::KEY_F12, "Free",
+                           new osgGA::TrackballManipulator);
+  viewer.setCameraManipulator(ks);
 
-  viewer.setCameraManipulator(playerManipulator);
+
+  
 
   /////////////////////////////////////////////////
   // ------------------------------------------- //
   /////////////////////////////////////////////////
+
+  // Ennemy section:
+  osg::ref_ptr<osg::Group> ennemies(new osg::Group);
+  osg::ref_ptr<osg::Node>  templateEnnemy =
+    osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
+
+  // First:
+  osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
+  first->setMatrix(osg::Matrix::translate(00.0f, 20.0f, 0.0f));
+  first->addChild(templateEnnemy);
+
+  osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
+  first->addUpdateCallback(ac);
+  // ac->velocity.y() = 25.0f;
+  ennemies->addChild(first);
+
+  root->addChild(ennemies);
+
+  // Set the cannonical nodes path --------------------
+  assert(Soleil::GetPathByNodeName(*root, "Player").empty() == false);
+  Soleil::SceneManager::RegisterNodePath(
+    Soleil::ConstHash("Player"), Soleil::GetPathByNodeName(*root, "Player"));
 }
 
 int

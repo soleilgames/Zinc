@@ -64,6 +64,7 @@ add_executable(zinc-osg
   SceneManager.cpp
   EventManager.cpp
   Time.cpp
+  AlienCraft.cpp
   )
 
 

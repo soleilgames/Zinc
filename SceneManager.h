@@ -24,8 +24,8 @@ namespace Soleil {
                                  float*     distanceToObject = nullptr);
 
   public: // Scene lookup
-    osg::NodePath GetNodePath(ObjectID id);
-    void RegisterNodePath(ObjectID, osg::NodePath nodePath);
+    static osg::NodePath GetNodePath(ObjectID id);
+    static void RegisterNodePath(ObjectID, osg::NodePath nodePath);
 
   protected:
     std::map<ObjectID, osg::NodePath> nodesPath;

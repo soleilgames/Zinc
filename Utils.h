@@ -124,4 +124,11 @@ normalize(const osg::Vec3& node)
   return normalized;
 }
 
+inline osg::Vec3
+limit(const osg::Vec3& vec, const float maxSize)
+{
+  if (vec.length() <= maxSize) return vec;
+  return vec * (1 - maxSize / vec.length());
+}
+
 #endif /* SOLEIL__UTILS_H_ */

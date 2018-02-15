@@ -81,11 +81,17 @@ namespace Soleil {
   {
     assert(sceneManager && "Call SceneManager::Init method");
 
-    assert(nodesPath.find(id) != nodesPath.end() && "Node not found");
-    return nodesPath[id];
+    assert(sceneManager->nodesPath.find(id) != sceneManager->nodesPath.end() &&
+           "Node not found");
+    return sceneManager->nodesPath[id];
   }
 
-  void SceneManager::RegisterNodePath(ObjectID, osg::NodePath nodePath) {}
+  void SceneManager::RegisterNodePath(ObjectID id, osg::NodePath nodePath)
+  {
+    assert(sceneManager && "Call SceneManager::Init method");
+
+    sceneManager->nodesPath[id] = nodePath;
+  }
 
   void SceneManager::RegisterParticleSystem(
     ObjectID id, osg::ref_ptr<osgParticle::ParticleSystem> system)
