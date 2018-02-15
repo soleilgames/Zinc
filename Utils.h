@@ -46,8 +46,8 @@ namespace Soleil {
 
     void apply(osg::Node& node) override
     {
-      SOLEIL__LOGGER_DEBUG("Searching for '", name,
-                           "' in node: ", node.getName());
+      // SOLEIL__LOGGER_DEBUG("Searching for '", name,
+      //                      "' in node: ", node.getName());
       if (node.getName() == name) {
         path  = this->getNodePath();
         found = &node;

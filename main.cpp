@@ -261,8 +261,7 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   osg::Vec3       collisionNormal;
 
   if (Soleil::SceneManager::SegmentCollision(currentPosition, nextPosition,
-                                             &collisionNormal)) {
-
+                                             PlayerNode, &collisionNormal)) {
     Soleil::EventManager::Emit(std::make_shared<Soleil::EventDestructObject>(
       Soleil::SceneManager::GetNodePath(Soleil::ConstHash("Player"))));
     Soleil::EventManager::Emit(std::make_shared<Soleil::EventGameOver>());
@@ -622,6 +621,11 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   assert(skycube);
   osg::ref_ptr<SkyBox> skybox = new SkyBox;
   skybox->addChild(skycube);
+  auto mask = skybox->getNodeMask();
+  mask  &= ~Soleil::SceneManager::Mask::Collision;
+
+  skybox->setNodeMask(mask);
+  skycube->setNodeMask(mask);
   root->addChild(skybox);
 
   // root->addChild(createAxisPath(10));
@@ -631,7 +635,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osgDB::readNodeFile("../media/islands.3ds.osgt")->asGroup();
   assert(model);
   root->addChild(model);
-  Soleil::SceneManager::Init(model);
+  // Soleil::SceneManager::Init(model);
+  Soleil::SceneManager::Init(root);
 
   /////////////////////////////
   // ----------------------- //
@@ -754,7 +759,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   // First:
   osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
-  first->setMatrix(osg::Matrix::translate(00.0f, 20.0f, 0.0f));
+  first->setMatrix(osg::Matrix::translate(00.0f, 50.0f, 0.0f));
   first->addChild(templateEnnemy);
 
   osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;

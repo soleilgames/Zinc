@@ -88,7 +88,7 @@ namespace Soleil {
     osg::Vec3       collisionNormal;
 
     if (Soleil::SceneManager::SegmentCollision(
-          node->getMatrix().getTrans(), nextPosition, &collisionNormal)) {
+          node->getMatrix().getTrans(), nextPosition, node, &collisionNormal)) {
 
       osg::NodePath p = visitor->getNodePath();
       Soleil::EventManager::Emit(

@@ -6,6 +6,7 @@
 
 #include "Logger.h"
 
+#include "Utils.h"
 #include <functional>
 #include <osg/ComputeBoundsVisitor>
 #include <osg/Drawable>
@@ -37,6 +38,118 @@ namespace Soleil {
         osgUtil::Intersector::IntersectionLimit::LIMIT_NEAREST); // NO_LIMIT
     // LIMIT_NEAREST
     osgUtil::IntersectionVisitor visitor(lineSegment);
+    visitor.setTraversalMask(Soleil::SceneManager::Mask::Collision);
+    
+    sceneManager->sceneRoot->accept(visitor);
+
+    // TODO: Do polytope fetch. Collision is taken from the center of mass wich
+    // allows wings to avoid colliding
+
+    if (lineSegment->containsIntersections()) {
+      float nearestDistance = std::numeric_limits<float>::max();
+      SOLEIL__LOGGER_DEBUG("----");
+      for (const auto& intersection : lineSegment->getIntersections()) {
+        const float distance =
+          (start - intersection.getWorldIntersectPoint()).length();
+
+        if (nearestDistance > distance) {
+          nearestDistance = distance;
+
+          if (normal) {
+            *normal = intersection.getWorldIntersectNormal();
+          }
+        }
+
+        SOLEIL__LOGGER_DEBUG(
+          "COLLISION between collider and ",
+          intersection.nodePath.back()->getName(),
+          ". Normal: ", intersection.getWorldIntersectNormal(),
+          ". Distance=", distance);
+      }
+
+      if (distanceToObject) {
+        *distanceToObject = nearestDistance;
+      }
+      if (normal) {
+        normal->normalize();
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  class IntersectionVisitor : public osgUtil::IntersectionVisitor
+  {
+  public:
+    IntersectionVisitor(
+      osg::Node* collider, osgUtil::Intersector* intersector = nullptr,
+      osgUtil::IntersectionVisitor::ReadCallback* readCallback = nullptr);
+
+    void apply(osg::Node& node) override;
+    void apply(osg::Group& node) override;
+    void apply(osg::Transform& node) override;
+
+    osg::Node* collider;
+
+    ~IntersectionVisitor() {}
+  };
+
+  IntersectionVisitor::IntersectionVisitor(
+    osg::Node* collider, osgUtil::Intersector* intersector,
+    osgUtil::IntersectionVisitor::ReadCallback* readCallback)
+    : osgUtil::IntersectionVisitor(intersector, readCallback)
+    , collider(collider)
+  {
+  }
+
+  void IntersectionVisitor::apply(osg::Node& node)
+  {
+    if (&node == collider) {
+      //SOLEIL__LOGGER_DEBUG("Avoiding self");
+      return;
+    }
+    //SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
+
+    osgUtil::IntersectionVisitor::apply(node);
+  }
+
+  void IntersectionVisitor::apply(osg::Group& node)
+  {
+    if (&node == collider) {
+      //SOLEIL__LOGGER_DEBUG("Avoiding self");
+      return;
+    }
+    //SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
+
+    osgUtil::IntersectionVisitor::apply(node);
+  }
+
+  void IntersectionVisitor::apply(osg::Transform& node)
+  {
+    if (&node == collider) {
+      //SOLEIL__LOGGER_DEBUG("Avoiding self");
+      return;
+    }
+    //SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
+
+    osgUtil::IntersectionVisitor::apply(node);
+  }
+
+  bool SceneManager::SegmentCollision(const osg::Vec3& start,
+                                      const osg::Vec3& end, osg::Node* collider,
+                                      osg::Vec3* normal,
+                                      float*     distanceToObject)
+  {
+    assert(sceneManager && "Call SceneManager::Init method");
+
+    osg::ref_ptr<osgUtil::LineSegmentIntersector> lineSegment =
+      new osgUtil::LineSegmentIntersector(
+        osgUtil::Intersector::CoordinateFrame::MODEL, start, end, nullptr,
+        osgUtil::Intersector::IntersectionLimit::LIMIT_NEAREST); // NO_LIMIT
+    // LIMIT_NEAREST
+    IntersectionVisitor visitor(collider, lineSegment);
+    visitor.setTraversalMask(Soleil::SceneManager::Mask::Collision);
 
     sceneManager->sceneRoot->accept(visitor);
 
