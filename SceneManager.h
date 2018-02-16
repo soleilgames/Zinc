@@ -18,21 +18,25 @@ namespace Soleil {
   public:
     enum Mask
     {
-      Render    = 1,
-      Collision = 32
+      Render    = 1 << 0,
+      Collision = 1 << 1,
+      Shootable = 1 << 2,
     };
 
   public:
     static void Init(osg::ref_ptr<osg::Group> sceneRoot);
 
   public: // Collisions and test
+    // static bool SegmentCollision(const osg::Vec3& start, const osg::Vec3&
+    // end,
+    //                              osg::Vec3* normal           = nullptr,
+    //                              float*     distanceToObject = nullptr);
     static bool SegmentCollision(const osg::Vec3& start, const osg::Vec3& end,
-                                 osg::Vec3* normal           = nullptr,
-                                 float*     distanceToObject = nullptr);
-    static bool SegmentCollision(const osg::Vec3& start, const osg::Vec3& end,
-                                 osg::Node* collider,
-                                 osg::Vec3* normal           = nullptr,
-                                 float*     distanceToObject = nullptr);
+                                 osg::Node*          collider,
+                                 osg::Vec3*          normal           = nullptr,
+                                 float*              distanceToObject = nullptr,
+                                 osg::Node::NodeMask mask = Collision,
+                                 osg::NodePath*      path = nullptr);
 
   public: // Scene lookup
     static osg::NodePath GetNodePath(ObjectID id);

@@ -49,6 +49,7 @@
 #include <osg/Timer>
 
 #include "AlienCraft.h"
+#include "EntityGroup.h"
 #include "EventManager.h"
 #include "GameEvent.h"
 #include "Logger.h"
@@ -79,6 +80,7 @@ osg::ref_ptr<osg::MatrixTransform>           GroupPtr;
 osg::ref_ptr<osg::MatrixTransform>           PlayerNode;
 osg::ref_ptr<osg::MatrixTransform>           PlaneNode;
 osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
+Soleil::EventManager                         SystemEventManager;
 
 // TODO: Not here:
 
@@ -265,8 +267,10 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
     Soleil::EventManager::Emit(std::make_shared<Soleil::EventDestructObject>(
       Soleil::SceneManager::GetNodePath(Soleil::ConstHash("Player"))));
     Soleil::EventManager::Emit(std::make_shared<Soleil::EventGameOver>());
-    Soleil::EventManager::Delay(
-      3.0, std::make_shared<Soleil::EventLoadLevel>("first"));
+    // Soleil::EventManager::Delay(
+    //   3.0, std::make_shared<Soleil::EventLoadLevel>("first"));
+    SystemEventManager.delay(3.0,
+                             std::make_shared<Soleil::EventLoadLevel>("first"));
     userControl = false;
   } else {
     PlayerNode->setMatrix(matrix);
@@ -291,17 +295,6 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   /////////////////////
   switch (event.getEventType()) {
     case osgGA::GUIEventAdapter::EventType::PUSH: {
-      // TODO: Every x frames
-      static int exp = 0;
-
-      const unsigned int id = exp % NumOfExplosions;
-      explosion->setPosition(
-        id, targetPosition + planeOrientationMatrix * osg::Vec3(0, 100, 0));
-      explosionImpostor[id]->time = 0.0f;
-      explosion->computeBound();
-      explosion->dirtyBound();
-
-      assert(shootTracers->getNumDrawables() >= id);
 
       const osg::Vec3 tracerStartPoint =
         targetPosition +
@@ -310,6 +303,29 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
                     0); // TODO: Workaround to avoid starting point to be
                         // at the tail, next attach the start point to a
                         // bone or a node
+
+      const osg::Vec3 maxRange =
+        targetPosition + planeOrientationMatrix * osg::Vec3(0, 100, 0);
+
+      osg::NodePath path;
+      if (Soleil::SceneManager::SegmentCollision(
+            tracerStartPoint, maxRange, PlayerNode, nullptr, nullptr,
+            Soleil::SceneManager::Mask::Shootable, &path)) {
+        Soleil::EventManager::Emit(
+          std::make_shared<Soleil::EventDestructObject>(path));
+      }
+
+      // TODO: Every x frames
+      static int exp = 0;
+
+      const unsigned int id = exp % NumOfExplosions;
+      explosion->setPosition(id, maxRange);
+      explosionImpostor[id]->time = 0.0f;
+      explosion->computeBound();
+      explosion->dirtyBound();
+
+      assert(shootTracers->getNumDrawables() >= id);
+
       tracerUpdater->tracers[id]->updateHead(
         tracerStartPoint, planeOrientationMatrix * osg::Vec3f(0, 1, 0));
       ++exp;
@@ -460,6 +476,9 @@ createExplosionQuad()
   quad->setStateSet(texture3d);
 #endif
 
+  quad->setNodeMask(quad->getNodeMask() &
+                    (~Soleil::SceneManager::Mask::Shootable |
+                     ~Soleil::SceneManager::Mask::Collision));
   return quad;
 }
 
@@ -609,8 +628,21 @@ CreateExplosionEmitter()
 void
 FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 {
-  auto plane = createPlayerGraph();
-  root->addChild(plane);
+  Soleil::EventManager::Init();
+  // Soleil::EventManager::Enroll(
+  //   Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
+  //     Soleil::EventLoadLevel* event =
+  //     static_cast<Soleil::EventLoadLevel*>(&e);
+
+  //     root->removeChildren(0, root->getNumChildren());
+  //     // TODO: Clear Event Queue
+  //     FirstLevelSetup(root, viewer);
+  //   });
+
+  auto                              plane = createPlayerGraph();
+  osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup(new Soleil::EntityGroup);
+  playerEntityGroup->addChild(plane);
+  root->addChild(playerEntityGroup);
 
   ///////////////////////
   // Setting the Scene //
@@ -622,7 +654,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   osg::ref_ptr<SkyBox> skybox = new SkyBox;
   skybox->addChild(skycube);
   auto mask = skybox->getNodeMask();
-  mask  &= ~Soleil::SceneManager::Mask::Collision;
+  mask &= ~Soleil::SceneManager::Mask::Collision;
+  mask &= ~Soleil::SceneManager::Mask::Shootable;
 
   skybox->setNodeMask(mask);
   skycube->setNodeMask(mask);
@@ -634,6 +667,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   osg::ref_ptr<osg::Group> model =
     osgDB::readNodeFile("../media/islands.3ds.osgt")->asGroup();
   assert(model);
+  model->setNodeMask(model->getNodeMask() &
+                     ~Soleil::SceneManager::Mask::Shootable);
   root->addChild(model);
   // Soleil::SceneManager::Init(model);
   Soleil::SceneManager::Init(root);
@@ -643,6 +678,11 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   /////////////////////////////
 
   // osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
+  explosion->setNodeMask(explosion->getNodeMask() &
+                         ~Soleil::SceneManager::Mask::Shootable);
+  explosion->setNodeMask(explosion->getNodeMask() &
+                         ~Soleil::SceneManager::Mask::Collision);
+
   explosion->setMode(osg::Billboard::POINT_ROT_EYE);
   explosion->setDataVariance(osg::Object::DataVariance::DYNAMIC);
   osg::StateSet* ss = explosion->getOrCreateStateSet();
@@ -706,17 +746,33 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
         osg::Vec3(1, 1, 1) * osg::computeLocalToWorld(event->object);
       Soleil::SceneManager::AddParticleEmitter(0, CreateDustEmitter(point));
 
-      // Remove from the first group
-      auto revit = event->object.rbegin();
-      auto child = revit;
-      ++revit; // His parent;
-      while (revit != event->object.rend()) {
-        if ((*revit)->asGroup()) {
-          (*revit)->asGroup()->removeChild(*child);
-        }
-        child = revit;
-        ++revit;
+      std::stringstream s;
+      for (const auto v : event->object) {
+        s << Soleil::toName(*v) << "/";
       }
+      SOLEIL__LOGGER_DEBUG(s.str());
+
+      Soleil::EntityGroup* group =
+        dynamic_cast<Soleil::EntityGroup*>(event->object[1]);
+      assert(group && "Cannot remove from other than EntityGroup");
+      group->removeChild(event->object[2]);
+
+      // Remove from the first group
+      // auto revit = event->object.rbegin();
+      // auto child = revit;
+      // ++revit; // His parent;
+      // while (revit != event->object.rend()) {
+      //   if ((*revit)->asGroup()) {
+
+      //     SOLEIL__LOGGER_DEBUG(">>> ", Soleil::toName(**revit), ".erase->",
+      //                          Soleil::toName(**child));
+
+      //     (*revit)->asGroup()->removeChild(*child);
+      //     return;
+      //   }
+      //   child = revit;
+      //   ++revit;
+      // }
       // TODO: I whish to have a triangle outpouring
     });
 
@@ -753,19 +809,22 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   /////////////////////////////////////////////////
 
   // Ennemy section:
-  osg::ref_ptr<osg::Group> ennemies(new osg::Group);
-  osg::ref_ptr<osg::Node>  templateEnnemy =
+  osg::ref_ptr<Soleil::EntityGroup> ennemies(new Soleil::EntityGroup);
+  osg::ref_ptr<osg::Node>           templateEnnemy =
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
-  first->setMatrix(osg::Matrix::translate(00.0f, 50.0f, 0.0f));
-  first->addChild(templateEnnemy);
+  for (int i = 0; i < 50; ++i) {
+    osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
+    first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
+                                            Random(50, 250)));
+    first->addChild(templateEnnemy);
 
-  osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
-  first->addUpdateCallback(ac);
-  // ac->velocity.y() = 25.0f;
-  ennemies->addChild(first);
+    osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
+    first->addUpdateCallback(ac);
+    // ac->velocity.y() = 25.0f;
+    ennemies->addChild(first);
+  }
 
   root->addChild(ennemies);
 
@@ -784,9 +843,18 @@ main(int // argc
 
   osg::ref_ptr<osg::Group> root = new osg::Group();
   osgViewer::Viewer        viewer;
-  Soleil::EventManager::Init();
 
-  Soleil::EventManager::Enroll(
+  // Soleil::EventManager::Init();
+  // Soleil::EventManager::Enroll(
+  //   Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
+  //     Soleil::EventLoadLevel* event =
+  //     static_cast<Soleil::EventLoadLevel*>(&e);
+
+  //     root->removeChildren(0, root->getNumChildren());
+  //     // TODO: Clear Event Queue
+  //     FirstLevelSetup(root, viewer);
+  //   });
+  SystemEventManager.enroll(
     Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
       Soleil::EventLoadLevel* event = static_cast<Soleil::EventLoadLevel*>(&e);
 
@@ -794,6 +862,8 @@ main(int // argc
       // TODO: Clear Event Queue
       FirstLevelSetup(root, viewer);
     });
+
+  FirstLevelSetup(root, viewer);
 
   // --------------------------------------------
   // Attach the scene
@@ -813,6 +883,7 @@ main(int // argc
     double deltaTime =
       viewer.getFrameStamp()->getSimulationTime() - previousTime;
     Soleil::EventManager::ProcessEvents(deltaTime);
+    SystemEventManager.processEvents(deltaTime);
     previousTime = viewer.getFrameStamp()->getSimulationTime();
   }
   return 0;

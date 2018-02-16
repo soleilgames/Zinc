@@ -26,58 +26,60 @@ namespace Soleil {
     sceneManager->sceneRoot = sceneRoot;
   }
 
-  bool SceneManager::SegmentCollision(const osg::Vec3& start,
-                                      const osg::Vec3& end, osg::Vec3* normal,
-                                      float* distanceToObject)
-  {
-    assert(sceneManager && "Call SceneManager::Init method");
+  // bool SceneManager::SegmentCollision(const osg::Vec3& start,
+  //                                     const osg::Vec3& end, osg::Vec3*
+  //                                     normal,
+  //                                     float* distanceToObject)
+  // {
+  //   assert(sceneManager && "Call SceneManager::Init method");
 
-    osg::ref_ptr<osgUtil::LineSegmentIntersector> lineSegment =
-      new osgUtil::LineSegmentIntersector(
-        osgUtil::Intersector::CoordinateFrame::MODEL, start, end, nullptr,
-        osgUtil::Intersector::IntersectionLimit::LIMIT_NEAREST); // NO_LIMIT
-    // LIMIT_NEAREST
-    osgUtil::IntersectionVisitor visitor(lineSegment);
-    visitor.setTraversalMask(Soleil::SceneManager::Mask::Collision);
-    
-    sceneManager->sceneRoot->accept(visitor);
+  //   osg::ref_ptr<osgUtil::LineSegmentIntersector> lineSegment =
+  //     new osgUtil::LineSegmentIntersector(
+  //       osgUtil::Intersector::CoordinateFrame::MODEL, start, end, nullptr,
+  //       osgUtil::Intersector::IntersectionLimit::LIMIT_NEAREST); // NO_LIMIT
+  //   // LIMIT_NEAREST
+  //   osgUtil::IntersectionVisitor visitor(lineSegment);
+  //   visitor.setTraversalMask(Soleil::SceneManager::Mask::Collision);
 
-    // TODO: Do polytope fetch. Collision is taken from the center of mass wich
-    // allows wings to avoid colliding
+  //   sceneManager->sceneRoot->accept(visitor);
 
-    if (lineSegment->containsIntersections()) {
-      float nearestDistance = std::numeric_limits<float>::max();
-      SOLEIL__LOGGER_DEBUG("----");
-      for (const auto& intersection : lineSegment->getIntersections()) {
-        const float distance =
-          (start - intersection.getWorldIntersectPoint()).length();
+  //   // TODO: Do polytope fetch. Collision is taken from the center of mass
+  //   wich
+  //   // allows wings to avoid colliding
 
-        if (nearestDistance > distance) {
-          nearestDistance = distance;
+  //   if (lineSegment->containsIntersections()) {
+  //     float nearestDistance = std::numeric_limits<float>::max();
+  //     SOLEIL__LOGGER_DEBUG("----");
+  //     for (const auto& intersection : lineSegment->getIntersections()) {
+  //       const float distance =
+  //         (start - intersection.getWorldIntersectPoint()).length();
 
-          if (normal) {
-            *normal = intersection.getWorldIntersectNormal();
-          }
-        }
+  //       if (nearestDistance > distance) {
+  //         nearestDistance = distance;
 
-        SOLEIL__LOGGER_DEBUG(
-          "COLLISION between collider and ",
-          intersection.nodePath.back()->getName(),
-          ". Normal: ", intersection.getWorldIntersectNormal(),
-          ". Distance=", distance);
-      }
+  //         if (normal) {
+  //           *normal = intersection.getWorldIntersectNormal();
+  //         }
+  //       }
 
-      if (distanceToObject) {
-        *distanceToObject = nearestDistance;
-      }
-      if (normal) {
-        normal->normalize();
-      }
+  //       SOLEIL__LOGGER_DEBUG(
+  //         "COLLISION between collider and ",
+  //         intersection.nodePath.back()->getName(),
+  //         ". Normal: ", intersection.getWorldIntersectNormal(),
+  //         ". Distance=", distance);
+  //     }
 
-      return true;
-    }
-    return false;
-  }
+  //     if (distanceToObject) {
+  //       *distanceToObject = nearestDistance;
+  //     }
+  //     if (normal) {
+  //       normal->normalize();
+  //     }
+
+  //     return true;
+  //   }
+  //   return false;
+  // }
 
   class IntersectionVisitor : public osgUtil::IntersectionVisitor
   {
@@ -106,10 +108,10 @@ namespace Soleil {
   void IntersectionVisitor::apply(osg::Node& node)
   {
     if (&node == collider) {
-      //SOLEIL__LOGGER_DEBUG("Avoiding self");
+      // SOLEIL__LOGGER_DEBUG("Avoiding self");
       return;
     }
-    //SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
+    // SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
 
     osgUtil::IntersectionVisitor::apply(node);
   }
@@ -117,10 +119,10 @@ namespace Soleil {
   void IntersectionVisitor::apply(osg::Group& node)
   {
     if (&node == collider) {
-      //SOLEIL__LOGGER_DEBUG("Avoiding self");
+      // SOLEIL__LOGGER_DEBUG("Avoiding self");
       return;
     }
-    //SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
+    // SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
 
     osgUtil::IntersectionVisitor::apply(node);
   }
@@ -128,18 +130,20 @@ namespace Soleil {
   void IntersectionVisitor::apply(osg::Transform& node)
   {
     if (&node == collider) {
-      //SOLEIL__LOGGER_DEBUG("Avoiding self");
+      // SOLEIL__LOGGER_DEBUG("Avoiding self");
       return;
     }
-    //SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
+    // SOLEIL__LOGGER_DEBUG("Descending on ", toName(node));
 
     osgUtil::IntersectionVisitor::apply(node);
   }
 
   bool SceneManager::SegmentCollision(const osg::Vec3& start,
                                       const osg::Vec3& end, osg::Node* collider,
-                                      osg::Vec3* normal,
-                                      float*     distanceToObject)
+                                      osg::Vec3*          normal,
+                                      float*              distanceToObject,
+                                      osg::Node::NodeMask mask,
+                                      osg::NodePath*      path)
   {
     assert(sceneManager && "Call SceneManager::Init method");
 
@@ -149,7 +153,7 @@ namespace Soleil {
         osgUtil::Intersector::IntersectionLimit::LIMIT_NEAREST); // NO_LIMIT
     // LIMIT_NEAREST
     IntersectionVisitor visitor(collider, lineSegment);
-    visitor.setTraversalMask(Soleil::SceneManager::Mask::Collision);
+    visitor.setTraversalMask(mask);
 
     sceneManager->sceneRoot->accept(visitor);
 
@@ -165,6 +169,9 @@ namespace Soleil {
 
         if (nearestDistance > distance) {
           nearestDistance = distance;
+          if (path) {
+            *path = intersection.nodePath; // TODO: Avoid multi-copies
+          }
 
           if (normal) {
             *normal = intersection.getWorldIntersectNormal();
@@ -173,7 +180,7 @@ namespace Soleil {
 
         SOLEIL__LOGGER_DEBUG(
           "COLLISION between collider and ",
-          intersection.nodePath.back()->getName(),
+          toName(*intersection.nodePath.back()),
           ". Normal: ", intersection.getWorldIntersectNormal(),
           ". Distance=", distance);
       }
