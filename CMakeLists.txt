@@ -66,6 +66,7 @@ add_executable(zinc-osg
   Time.cpp
   EntityGroup.cpp
   AlienCraft.cpp
+  ParticleObjects.cpp
   )
 
 

@@ -1,8 +1,8 @@
 
 #include "EventManager.h"
 
-#include <osg/Node>
 #include "stringutils.h"
+#include <osg/Node>
 
 namespace Soleil {
 
@@ -31,6 +31,21 @@ namespace Soleil {
 
   public:
     EventGameOver()
+      : Event(Type())
+    {
+    }
+  };
+
+  class EventPlayerDestroyed : public Event
+  {
+  public:
+    static constexpr EventType Type(void)
+    {
+      return ConstHash("EventPlayerDestroyed");
+    }
+
+  public:
+    EventPlayerDestroyed()
       : Event(Type())
     {
     }

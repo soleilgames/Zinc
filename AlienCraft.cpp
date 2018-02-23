@@ -26,6 +26,7 @@
 #include "EventManager.h"
 #include "GameEvent.h"
 #include "Logger.h"
+#include "ParticleObjects.h"
 #include "SceneManager.h"
 #include "Utils.h"
 
@@ -95,6 +96,20 @@ namespace Soleil {
         std::make_shared<Soleil::EventDestructObject>(p));
     } else {
       node->setMatrix(m);
+    }
+
+    // Shoot the player if close enough ----------------------------------------
+    const osg::Vec3 targetToCraft = target - current;
+    const float     facing        = normalize(targetToCraft) * normalize(velocity);
+    //SOLEIL__LOGGER_DEBUG("FACING: ", facing);
+    if (targetToCraft.length() < 50.0f && facing > 0.98f) {
+      // TODO: Limit the number of shoot
+
+      const osg::Vec3 normalizedVelocity = normalize(velocity);
+      const osg::Vec3 gun = current + normalizedVelocity * node->getBound().radius() * 1.1f;
+      // To avoid the alien craft destruct itself when shooting;
+      
+      ShootEmitter::EmitAlienShoot(gun, normalizedVelocity * 100.0f);
     }
 
     previousTime = visitor->getFrameStamp()->getSimulationTime();

@@ -37,6 +37,7 @@
 #include <osgGA/KeySwitchMatrixManipulator>
 #include <osgGA/NodeTrackerManipulator>
 #include <osgGA/TrackballManipulator>
+#include <osgParticle/BounceOperator>
 #include <osgParticle/ModularEmitter>
 #include <osgParticle/ModularProgram>
 #include <osgParticle/ParticleSystem>
@@ -53,6 +54,7 @@
 #include "EventManager.h"
 #include "GameEvent.h"
 #include "Logger.h"
+#include "ParticleObjects.h"
 #include "SceneManager.h"
 #include "ShootTracer.h"
 #include "SkyBox.h"
@@ -150,7 +152,7 @@ private:
   osg::Quat   cameraAttitude; /// Used to slerp the rotation to the target
   osg::Matrix viewMatrix;
 
-private:
+public:
   bool userControl;
 };
 
@@ -539,6 +541,7 @@ CreateExplosionPS(osg::Group& parent)
   osg::ref_ptr<osgParticle::ModularProgram> program =
     new osgParticle::ModularProgram;
   program->setParticleSystem(ps);
+  // program->addOperator(new osgParticle::BounceOperator);
 
   osg::ref_ptr<osg::Geode> geode = new osg::Geode;
   geode->addDrawable(ps);
@@ -621,6 +624,54 @@ CreateExplosionEmitter()
   shooter->setInitialSpeedRange(1.0f * scale, 10.0f * scale);
 
   return emitter;
+}
+
+// ------- Alien Shoot
+static osg::ref_ptr<osgParticle::ParticleSystem>
+CreateAlienShootPS(osg::Group& parent)
+{
+  constexpr float                           scale = 1.0f;
+  osg::ref_ptr<osgParticle::ParticleSystem> ps =
+    new osgParticle::ParticleSystem;
+
+  ps->setDefaultAttributes("../media/textures/alienshoot.png", false, false);
+
+  float radius  = 0.4f * scale;
+  float density = 1.2f; // 1.0kg/m^3
+
+  auto& defaultParticleTemplate = ps->getDefaultParticleTemplate();
+  defaultParticleTemplate.setLifeTime(1.0);
+  // defaultParticleTemplate.setSizeRange(osgParticle::rangef(0.75f, 3.0f));
+  // defaultParticleTemplate.setAlphaRange(osgParticle::rangef(0.1f, 1.0f));
+  // defaultParticleTemplate.setColorRange(osgParticle::rangev4(
+  //   osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f), osg::Vec4(1.0f, 1.0f, 1.0f, 0.0f)));
+  defaultParticleTemplate.setRadius(radius);
+  // defaultParticleTemplate.setMass(density * radius * radius * radius *
+  // osg::PI *
+  //                                 4.0f / 3.0f);
+
+  // TODO: Try         _program = new osgParticle::FluidProgram;
+
+  osg::ref_ptr<osgParticle::ModularProgram> program =
+    new osgParticle::ModularProgram;
+  program->setParticleSystem(ps);
+  program->addOperator(new Soleil::CollisionOperator);
+
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+  geode->addDrawable(ps);
+  parent.addChild(program);
+  parent.addChild(geode);
+
+  // parent->addChild(parent2);
+
+  osg::ref_ptr<osgParticle::ParticleSystemUpdater> updater =
+    new osgParticle::ParticleSystemUpdater;
+  updater->addParticleSystem(ps);
+  parent.addChild(updater);
+
+  // MeshSetLineMode(geometry);
+
+  return ps;
 }
 
 /* --- Explosion with particles --- */
@@ -750,12 +801,16 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
       for (const auto v : event->object) {
         s << Soleil::toName(*v) << "/";
       }
-      SOLEIL__LOGGER_DEBUG(s.str());
+      SOLEIL__LOGGER_DEBUG("Destroyed: ", s.str());
 
       Soleil::EntityGroup* group =
         dynamic_cast<Soleil::EntityGroup*>(event->object[1]);
       assert(group && "Cannot remove from other than EntityGroup");
       group->removeChild(event->object[2]);
+      if (event->object[2]->getName() == "Player") {
+        Soleil::EventManager::Emit(
+          std::make_shared<Soleil::EventPlayerDestroyed>());
+      }
 
       // Remove from the first group
       // auto revit = event->object.rbegin();
@@ -775,6 +830,15 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
       // }
       // TODO: I whish to have a triangle outpouring
     });
+
+  ///////////////////////////
+  // Alien Shoot particles //
+  ///////////////////////////
+  osg::ref_ptr<osgParticle::ParticleSystem> alienShootPS =
+    CreateAlienShootPS(*root);
+  Soleil::SceneManager::RegisterParticleSystem(3, alienShootPS);
+  Soleil::SceneManager::AddParticleEmitter(
+    3, Soleil::ShootEmitter::CreateAlienShootEmitter());
 
   ///////////////////////////////////////////
   // Setting the player camera manipulator //
@@ -808,13 +872,21 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   // ------------------------------------------- //
   /////////////////////////////////////////////////
 
+  Soleil::EventManager::Enroll(
+    Soleil::EventPlayerDestroyed::Type(),
+    [playerManipulator](Soleil::Event& /*e*/) {
+      SystemEventManager.delay(
+        3.0, std::make_shared<Soleil::EventLoadLevel>("first"));
+      playerManipulator->userControl = false;
+    });
+
   // Ennemy section:
   osg::ref_ptr<Soleil::EntityGroup> ennemies(new Soleil::EntityGroup);
   osg::ref_ptr<osg::Node>           templateEnnemy =
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  for (int i = 0; i < 50; ++i) {
+  for (int i = 0; i < 5; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
     first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
                                             Random(50, 250)));
@@ -828,6 +900,22 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   root->addChild(ennemies);
 
+  // Add some test Ballon ------------------------
+  osg::ref_ptr<osg::Node> templateBalloon =
+    osgDB::readNodeFile("../media/ZincBalloon.osgt");
+
+  // First:
+  for (int i = 0; i < 10; ++i) {
+    osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
+    first->setMatrix(osg::Matrix::translate(
+      Random(-150, 150), Random(-150, 150), Random(-150, 150)));
+    first->addChild(templateBalloon);
+
+    // osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
+    // first->addUpdateCallback(ac);
+    ennemies->addChild(first);
+  }
+
   // Set the cannonical nodes path --------------------
   assert(Soleil::GetPathByNodeName(*root, "Player").empty() == false);
   Soleil::SceneManager::RegisterNodePath(
@@ -840,7 +928,6 @@ main(int // argc
      char* const // argv
        [])
 {
-
   osg::ref_ptr<osg::Group> root = new osg::Group();
   osgViewer::Viewer        viewer;
 

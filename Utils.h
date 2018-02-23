@@ -141,4 +141,16 @@ limit(const osg::Vec3& vec, const float maxSize)
   return vec * (1 - maxSize / vec.length());
 }
 
+/**
+ * Return a number close to 1.0f if A face B, less if not facing. A negative
+ * number if A face away B
+ */
+inline float
+facing(const osg::Vec3& A, const osg::Vec3& B, const osg::Vec3 directionOfA)
+{
+  const osg::Vec3 aToB   = normalize(B - A);
+  const float     facing = aToB * normalize(directionOfA);
+  return facing;
+}
+
 #endif /* SOLEIL__UTILS_H_ */

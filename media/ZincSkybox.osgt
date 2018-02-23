@@ -154,6 +154,7 @@ osg::Group {
                         WRAP_R REPEAT
                         MIN_FILTER LINEAR_MIPMAP_LINEAR
                         MAG_FILTER LINEAR
+			ResizeNonPowerOfTwoHint FALSE
                         Image TRUE {
                           UniqueID 29
                           FileName "textures/Daylight Box UV.png"
