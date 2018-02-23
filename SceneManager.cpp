@@ -179,8 +179,8 @@ namespace Soleil {
         }
 
         SOLEIL__LOGGER_DEBUG(
-          "COLLISION between collider and ",
-          toName(*intersection.nodePath.back()),
+          "COLLISION between ", (collider) ? toName(*collider) : "(collider)",
+          " and ", toName(*intersection.nodePath.back()),
           ". Normal: ", intersection.getWorldIntersectNormal(),
           ". Distance=", distance);
       }

@@ -22,13 +22,13 @@
 #ifndef SOLEIL__EVENTMANAGER_H_
 #define SOLEIL__EVENTMANAGER_H_
 
+#include <array>
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
-#include <deque>
 #include <string>
 #include <vector>
-#include <array>
 
 namespace Soleil {
 
@@ -38,13 +38,13 @@ namespace Soleil {
   {
   public:
     EventType getType(void) const noexcept { return type; }
+    virtual ~Event() {}
 
   protected:
     Event(const EventType type)
       : type(type)
     {
     }
-
 
     EventType type;
   };
@@ -83,14 +83,12 @@ namespace Soleil {
   private: // Delayed
     std::vector<std::pair<double, EventPtr>> delayed;
 
-    
   public:
     static void Init();
     static void Enroll(const EventType& eventType, EventListener listener);
     static void Emit(EventPtr event);
     static void ProcessEvents(double deltaTime);
     static void Delay(double time, EventPtr event);
-    
   };
 
 } // Soleil

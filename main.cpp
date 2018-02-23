@@ -117,13 +117,12 @@ private:
   float speed;
 };
 
-osg::ref_ptr<osg::Geode>     shootTracers = new osg::Geode;
-osg::ref_ptr<osg::Billboard> explosion    = new osg::Billboard;
 class DrawableStateCallback;
+osg::ref_ptr<osg::Geode>                         shootTracers;
+osg::ref_ptr<osg::Billboard>                     explosion;
 std::vector<osg::ref_ptr<DrawableStateCallback>> explosionImpostor;
 constexpr int                                    NumOfExplosions = 150;
-osg::ref_ptr<Soleil::ShootTracerCallback>        tracerUpdater =
-  new Soleil::ShootTracerCallback;
+osg::ref_ptr<Soleil::ShootTracerCallback>        tracerUpdater;
 //
 
 /* --- PlayerFlightCameraManipulator */
@@ -679,19 +678,11 @@ CreateAlienShootPS(osg::Group& parent)
 void
 FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 {
+  SOLEIL__LOGGER_DEBUG("Loading new level...");
   Soleil::EventManager::Init();
-  // Soleil::EventManager::Enroll(
-  //   Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
-  //     Soleil::EventLoadLevel* event =
-  //     static_cast<Soleil::EventLoadLevel*>(&e);
 
-  //     root->removeChildren(0, root->getNumChildren());
-  //     // TODO: Clear Event Queue
-  //     FirstLevelSetup(root, viewer);
-  //   });
-
-  auto                              plane = createPlayerGraph();
-  osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup(new Soleil::EntityGroup);
+  auto                              plane             = createPlayerGraph();
+  osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup = new Soleil::EntityGroup;
   playerEntityGroup->addChild(plane);
   root->addChild(playerEntityGroup);
 
@@ -727,6 +718,10 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   /////////////////////////////
   // ----------------------- //
   /////////////////////////////
+
+  shootTracers  = new osg::Geode;
+  explosion     = new osg::Billboard;
+  tracerUpdater = new Soleil::ShootTracerCallback;
 
   // osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
   explosion->setNodeMask(explosion->getNodeMask() &
@@ -789,19 +784,22 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   Soleil::EventManager::Enroll(
     Soleil::EventDestructObject::Type(), [root](Soleil::Event& e) {
+      // Soleil::EventDestructObject* event =
+      // static_cast<Soleil::EventDestructObject*>(&e);
       Soleil::EventDestructObject* event =
-        static_cast<Soleil::EventDestructObject*>(&e);
-
-      // Add an explosion at the center point
-      osg::Vec3 point =
-        osg::Vec3(1, 1, 1) * osg::computeLocalToWorld(event->object);
-      Soleil::SceneManager::AddParticleEmitter(0, CreateDustEmitter(point));
+        dynamic_cast<Soleil::EventDestructObject*>(&e);
+      assert(event);
 
       std::stringstream s;
       for (const auto v : event->object) {
         s << Soleil::toName(*v) << "/";
       }
       SOLEIL__LOGGER_DEBUG("Destroyed: ", s.str());
+
+      // Add an explosion at the center point
+      osg::Vec3 point =
+        osg::Vec3(1, 1, 1) * osg::computeLocalToWorld(event->object);
+      Soleil::SceneManager::AddParticleEmitter(0, CreateDustEmitter(point));
 
       Soleil::EntityGroup* group =
         dynamic_cast<Soleil::EntityGroup*>(event->object[1]);
@@ -812,22 +810,6 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
           std::make_shared<Soleil::EventPlayerDestroyed>());
       }
 
-      // Remove from the first group
-      // auto revit = event->object.rbegin();
-      // auto child = revit;
-      // ++revit; // His parent;
-      // while (revit != event->object.rend()) {
-      //   if ((*revit)->asGroup()) {
-
-      //     SOLEIL__LOGGER_DEBUG(">>> ", Soleil::toName(**revit), ".erase->",
-      //                          Soleil::toName(**child));
-
-      //     (*revit)->asGroup()->removeChild(*child);
-      //     return;
-      //   }
-      //   child = revit;
-      //   ++revit;
-      // }
       // TODO: I whish to have a triangle outpouring
     });
 
@@ -875,25 +857,27 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   Soleil::EventManager::Enroll(
     Soleil::EventPlayerDestroyed::Type(),
     [playerManipulator](Soleil::Event& /*e*/) {
+      SOLEIL__LOGGER_DEBUG("Player destroyed, delaying restart");
       SystemEventManager.delay(
         3.0, std::make_shared<Soleil::EventLoadLevel>("first"));
       playerManipulator->userControl = false;
     });
 
   // Ennemy section:
-  osg::ref_ptr<Soleil::EntityGroup> ennemies(new Soleil::EntityGroup);
+  osg::ref_ptr<Soleil::EntityGroup> ennemies = new Soleil::EntityGroup;
   osg::ref_ptr<osg::Node>           templateEnnemy =
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
   for (int i = 0; i < 5; ++i) {
-    osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
+    osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
     first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
                                             Random(50, 250)));
     first->addChild(templateEnnemy);
 
     osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
     first->addUpdateCallback(ac);
+    first->setName(Soleil::toString("FirstEnnemy_N", i));
     // ac->velocity.y() = 25.0f;
     ennemies->addChild(first);
   }
@@ -906,13 +890,14 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   // First:
   for (int i = 0; i < 10; ++i) {
-    osg::ref_ptr<osg::MatrixTransform> first(new osg::MatrixTransform);
+    osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
     first->setMatrix(osg::Matrix::translate(
       Random(-150, 150), Random(-150, 150), Random(-150, 150)));
     first->addChild(templateBalloon);
 
     // osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
     // first->addUpdateCallback(ac);
+    first->setName(Soleil::toString("Balloon_N", i));
     ennemies->addChild(first);
   }
 
@@ -920,6 +905,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   assert(Soleil::GetPathByNodeName(*root, "Player").empty() == false);
   Soleil::SceneManager::RegisterNodePath(
     Soleil::ConstHash("Player"), Soleil::GetPathByNodeName(*root, "Player"));
+
+  SOLEIL__LOGGER_DEBUG("New level loaded");
 }
 
 int
@@ -931,22 +918,12 @@ main(int // argc
   osg::ref_ptr<osg::Group> root = new osg::Group();
   osgViewer::Viewer        viewer;
 
-  // Soleil::EventManager::Init();
-  // Soleil::EventManager::Enroll(
-  //   Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
-  //     Soleil::EventLoadLevel* event =
-  //     static_cast<Soleil::EventLoadLevel*>(&e);
-
-  //     root->removeChildren(0, root->getNumChildren());
-  //     // TODO: Clear Event Queue
-  //     FirstLevelSetup(root, viewer);
-  //   });
   SystemEventManager.enroll(
     Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
       Soleil::EventLoadLevel* event = static_cast<Soleil::EventLoadLevel*>(&e);
 
+      SOLEIL__LOGGER_DEBUG("Need to load a new level");
       root->removeChildren(0, root->getNumChildren());
-      // TODO: Clear Event Queue
       FirstLevelSetup(root, viewer);
     });
 
