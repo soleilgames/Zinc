@@ -39,7 +39,9 @@ namespace Soleil {
     , mass(1.0f)
     , maxSpeed(4.0f)
     , maxForce(1.0f)
+    , fireRate(1.0f / 2.0f) // Two fire per second
     , previousTime(0.0f)
+    , lastShootTime(0.0f)
   {
   }
 
@@ -99,17 +101,22 @@ namespace Soleil {
     }
 
     // Shoot the player if close enough ----------------------------------------
-    const osg::Vec3 targetToCraft = target - current;
-    const float     facing        = normalize(targetToCraft) * normalize(velocity);
-    //SOLEIL__LOGGER_DEBUG("FACING: ", facing);
-    if (targetToCraft.length() < 50.0f && facing > 0.98f) {
-      // TODO: Limit the number of shoot
+    lastShootTime += deltaTime;
+    if (lastShootTime >= fireRate) {
+      const osg::Vec3 targetToCraft = target - current;
+      const float     facing = normalize(targetToCraft) * normalize(velocity);
+      // SOLEIL__LOGGER_DEBUG("FACING: ", facing);
+      if (targetToCraft.length() < 50.0f && facing > 0.98f) {
+        // TODO: Limit the number of shoot
 
-      const osg::Vec3 normalizedVelocity = normalize(velocity);
-      const osg::Vec3 gun = current + normalizedVelocity * node->getBound().radius() * 1.1f;
-      // To avoid the alien craft destruct itself when shooting;
-      
-      ShootEmitter::EmitAlienShoot(gun, normalizedVelocity * 100.0f);
+        const osg::Vec3 normalizedVelocity = normalize(velocity);
+        const osg::Vec3 gun =
+          current + normalizedVelocity * node->getBound().radius() * 1.1f;
+        // To avoid the alien craft destruct itself when shooting;
+
+        ShootEmitter::EmitAlienShoot(gun, normalizedVelocity * 100.0f);
+      }
+      lastShootTime = 0.0f;
     }
 
     previousTime = visitor->getFrameStamp()->getSimulationTime();
