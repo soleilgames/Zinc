@@ -79,7 +79,7 @@
 
 osg::Vec3                                    worldPosition;
 osg::ref_ptr<osg::MatrixTransform>           GroupPtr;
-osg::ref_ptr<osg::MatrixTransform>           PlayerNode;
+osg::ref_ptr<osg::PositionAttitudeTransform> PlayerNode;
 osg::ref_ptr<osg::MatrixTransform>           PlaneNode;
 osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
 Soleil::EventManager                         SystemEventManager;
@@ -167,7 +167,7 @@ PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
 }
 
 void
-PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd& matrix)
+PlayerFlightCameraManipulator::setByMatrix(const osg::Matrixd& /*matrix*/)
 {
   // assert(false && "// TODO: ");
 }
@@ -241,26 +241,33 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   rotation.makeRotate(-planeRoll * 0.005f, 0, 0, 1);
   planeAttitude *= rotation;
 
-  planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
-                     osg::Matrix::rotate(planePitch, 1, 0, 0);
+  osg::Quat qRoll;
+  qRoll.makeRotate(planeRoll, 0, 1, 0);
+  osg::Quat qPitch;
+  qPitch.makeRotate(planePitch, 1, 0, 0);
+  osg::Quat qResult = qRoll * qPitch * planeAttitude;//planeAttitude ;//* qRoll * qPitch;
+  // planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
+  //                    osg::Matrix::rotate(planePitch, 1, 0, 0);
 
-  osg::Matrix planeAttitudeMatrix;
-  planeAttitude.get(planeAttitudeMatrix);
-  PlaneNode->setMatrix(planeOrientation * planeAttitudeMatrix);
+  // osg::Matrix planeAttitudeMatrix;
+  // planeAttitude.get(planeAttitudeMatrix);
+  // PlaneNode->setMatrix(planeOrientation * planeAttitudeMatrix);
 
   ////////////////////////
   // Move the ROOT node //
   ////////////////////////
-  const osg::Matrix planeOrientationMatrix =
-    osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix);
-  const osg::Matrix matrix =
-    osg::Matrix::translate(planeOrientationMatrix *
-                           osg::Vec3(0.0f, Speed * delta, 0.0f)) *
-    PlayerNode->getMatrix();
+  // const osg::Matrix planeOrientationMatrix =
+  //   osg::Matrix::inverse(planeOrientation * planeAttitudeMatrix);
+  // const osg::Matrix matrix =
+  //   osg::Matrix::translate(planeOrientationMatrix *
+  //                          osg::Vec3(0.0f, Speed * delta, 0.0f)) *
+  //   PlayerNode->getMatrix();
+  const osg::Vec3 translate =
+    qResult * osg::Vec3(0.0f, Speed * delta, 0.0f) + PlayerNode->getPosition();
 
   // --- Collision test -----
-  const osg::Vec3 currentPosition = PlayerNode->getMatrix().getTrans();
-  const osg::Vec3 nextPosition    = matrix.getTrans();
+  const osg::Vec3 currentPosition = PlayerNode->getPosition();
+  const osg::Vec3 nextPosition    = translate;
   osg::Vec3       collisionNormal;
 
   if (Soleil::SceneManager::SegmentCollision(currentPosition, nextPosition,
@@ -274,7 +281,9 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
                              std::make_shared<Soleil::EventLoadLevel>("first"));
     userControl = false;
   } else {
-    PlayerNode->setMatrix(matrix);
+    // PlayerNode->setMatrix(matrix);
+    PlayerNode->setPosition(translate);
+    PlayerNode->setAttitude(qResult);
   }
 
   ////////////////////////////
@@ -282,11 +291,12 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   ////////////////////////////
   constexpr float SlerpSpeed = 3.0f;
 
-  const osg::Vec3 targetPosition = PlayerNode->getMatrix().getTrans();
+  const osg::Vec3 targetPosition = translate;
   const osg::Vec3 center         = targetPosition;
   const osg::Vec3 up             = osg::Vec3(0, 0, 1);
   osg::Quat       toRotation;
-  toRotation.set(PlaneNode->getMatrix());
+  //toRotation.set(PlaneNode->getMatrix());
+  toRotation = qResult;
   cameraAttitude.slerp(SlerpSpeed * delta, cameraAttitude, toRotation);
   const osg::Vec3 eye = targetPosition + (cameraAttitude * offset);
   viewMatrix          = osg::Matrix::lookAt(eye, center, up);
@@ -299,14 +309,14 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
 
       const osg::Vec3 tracerStartPoint =
         targetPosition +
-        planeOrientationMatrix *
+        qResult *
           osg::Vec3(0, 5.0f,
                     0); // TODO: Workaround to avoid starting point to be
                         // at the tail, next attach the start point to a
                         // bone or a node
 
       const osg::Vec3 maxRange =
-        targetPosition + planeOrientationMatrix * osg::Vec3(0, 100, 0);
+        targetPosition + qResult * osg::Vec3(0, 100, 0);
 
       osg::NodePath path;
       if (Soleil::SceneManager::SegmentCollision(
@@ -327,8 +337,8 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
 
       assert(shootTracers->getNumDrawables() >= id);
 
-      tracerUpdater->tracers[id]->updateHead(
-        tracerStartPoint, planeOrientationMatrix * osg::Vec3f(0, 1, 0));
+      tracerUpdater->tracers[id]->updateHead(tracerStartPoint,
+                                             qResult * osg::Vec3f(0, 1, 0));
       ++exp;
 
     } break;
@@ -485,10 +495,11 @@ createExplosionQuad()
 
 /* --- Explosion Impostor --- */
 
-static osg::ref_ptr<osg::MatrixTransform>
+static osg::ref_ptr<osg::PositionAttitudeTransform>
 createPlayerGraph()
 {
-  osg::ref_ptr<osg::MatrixTransform> group = new osg::MatrixTransform;
+  osg::ref_ptr<osg::PositionAttitudeTransform> group =
+    new osg::PositionAttitudeTransform;
   osg::ref_ptr<osg::Node> cessna = osgDB::readNodeFile("../media/Player.osgt");
   osg::ref_ptr<osg::Node> axes   = osgDB::readNodeFile("../media/axes.osgt");
   assert(cessna.get() != nullptr && "Root is null");

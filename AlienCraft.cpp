@@ -57,12 +57,23 @@ namespace Soleil {
       previousTime = visitor->getFrameStamp()->getSimulationTime();
     }
 
+    constexpr float ChaseRange = 200.0f * 200.0f; // (we are using lenght2)
+    constexpr float FireRange  = 50.0f * 50.0f;
+    constexpr float Facing     = 0.98f;
+
     // --- Compute behavior --------------------------------------
-    osg::NodePath playerPath = SceneManager::GetNodePath(ConstHash("Player"));
-    osg::Vec3     target     = playerPath.back()->getBound().center();
-    osg::Vec3     current    = node->getMatrix().getTrans();
-    osg::Vec3     desired    = normalize(target - current) * maxSpeed;
-    osg::Vec3     steering   = limit(desired - velocity, maxForce);
+    const osg::NodePath playerPath =
+      SceneManager::GetNodePath(ConstHash("Player"));
+    const osg::Vec3 target  = playerPath.back()->getBound().center();
+    const osg::Vec3 current = node->getMatrix().getTrans();
+    //const osg::Vec3 playerDirection = visitor->getFrameStamp()->getV
+    
+    const bool isPlayerInRange = (target - current).length2() < ChaseRange;
+    // const bool isPlayerFacingMe =
+    //   facing(target, current, PlayerDirection) < Facing;
+
+    osg::Vec3 desired  = normalize(target - current) * maxSpeed;
+    osg::Vec3 steering = limit(desired - velocity, maxForce);
 
     force = steering;
 
@@ -106,7 +117,7 @@ namespace Soleil {
       const osg::Vec3 targetToCraft = target - current;
       const float     facing = normalize(targetToCraft) * normalize(velocity);
       // SOLEIL__LOGGER_DEBUG("FACING: ", facing);
-      if (targetToCraft.length() < 50.0f && facing > 0.98f) {
+      if (targetToCraft.length() < FireRange && facing > Facing) {
         // TODO: Limit the number of shoot
 
         const osg::Vec3 normalizedVelocity = normalize(velocity);
