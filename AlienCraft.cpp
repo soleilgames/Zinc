@@ -61,6 +61,7 @@ namespace Soleil {
 
     constexpr float ChaseRange = 200.0f * 200.0f; // (we are using lenght2)
     constexpr float FireRange  = 50.0f * 50.0f;
+    constexpr float Avoidance  = 10.0f * 10.0f; // TODO: Use Avoidance behavior
     constexpr float Facing     = 0.98f;
 
     // --- Compute behavior --------------------------------------
@@ -74,7 +75,8 @@ namespace Soleil {
     const osg::Vec3 playerDirection =
       playerNode->getAttitude() * osg::Vec3(0, 1, 0);
 
-    const bool isPlayerInRange = (target - current).length2() < ChaseRange;
+    const bool isPlayerInRange    = (target - current).length2() < ChaseRange;
+    const bool isPlayerInTooClose = (target - current).length2() < Avoidance;
     const bool isPlayerFacingMe =
       facing(target, playerDirection, current) > Facing;
 
@@ -82,43 +84,12 @@ namespace Soleil {
       visitor->getFrameStamp()->getSimulationTime() - previousTime;
 
     osg::Vec3 desired(0, 0, 0);
-    if (isPlayerInRange && isPlayerFacingMe) {
+    if ((isPlayerInRange && isPlayerFacingMe) || isPlayerInTooClose) {
       desired =
         normalize(playerDirection) * maxSpeed; // TODO: Add Some randomeness
 
-      // if ((velocity * desired) < 0.0f) {
-      //   const float length = desired.length();
-
-      //   // TODO: Max possible rotation
-      //   desired = normalize(velocity) * length;
-      //   desired = osg::Quat(osg::PI_2, osg::Vec3(0, 1, 0)) * desired;
-      // }
-
-      // const osg::Vec3 steering = limit(desired - velocity, maxForce);
-      // const osg::Vec3 steering = desired;
-      // force += steering;
-
-      // SOLEIL__LOGGER_DEBUG("PlayerIsInRange && PlayerFacingMe => ",
-      // steering);
-
     } else if (isPlayerInRange) {
       desired = normalize(target - current) * maxSpeed;
-
-      // if ((velocity * desired) < 0.0f) {
-      //   const float length = desired.length();
-
-      //   // TODO: Max possible rotation
-      //   desired = normalize(velocity) * length;
-      //   desired = osg::Quat(osg::PI_2, osg::Vec3(0, 1, 0)) * desired;
-      // }
-
-      // const osg::Vec3 steering = limit(desired - velocity, maxForce);
-      // // const osg::Vec3 steering = desired - velocity;
-      // force = steering;
-
-      // SOLEIL__LOGGER_DEBUG("PlayerIsInRange => limite(desired(", desired,
-      //                      ") - velocity(", velocity, "), ...) = steering(",
-      //                      steering, ")");
 
       // Shoot the player if close enough --------------------------------------
       lastShootTime += deltaTime;
@@ -140,20 +111,7 @@ namespace Soleil {
       }
 
     } else {
-      osg::Vec3 desired = normalize(target - current) * maxSpeed;
-
-      // if ((velocity * desired) < 0.0f) {
-      // 	const float length = desired.length();
-
-      // 	// TODO: Max possible rotation
-      // 	desired = normalize(velocity) * length;
-      // 	desired = osg::Quat(osg::PI_2, osg::Vec3(0, 1, 0)) * desired;
-      // }
-
-      // osg::Vec3 steering = limit(desired - velocity, maxForce);
-
-      // SOLEIL__LOGGER_DEBUG("Steering: ", steering);
-      // force += steering;
+      desired = normalize(target - current) * maxSpeed;
     }
 
     SOLEIL__LOGGER_DEBUG("Desired (before rotation): ", desired);
