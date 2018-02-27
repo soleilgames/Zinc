@@ -245,7 +245,8 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   qRoll.makeRotate(planeRoll, 0, 1, 0);
   osg::Quat qPitch;
   qPitch.makeRotate(planePitch, 1, 0, 0);
-  osg::Quat qResult = qRoll * qPitch * planeAttitude;//planeAttitude ;//* qRoll * qPitch;
+  osg::Quat qResult =
+    qRoll * qPitch * planeAttitude; // planeAttitude ;//* qRoll * qPitch;
   // planeOrientation = osg::Matrix::rotate(planeRoll, 0, 1, 0) *
   //                    osg::Matrix::rotate(planePitch, 1, 0, 0);
 
@@ -295,7 +296,7 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   const osg::Vec3 center         = targetPosition;
   const osg::Vec3 up             = osg::Vec3(0, 0, 1);
   osg::Quat       toRotation;
-  //toRotation.set(PlaneNode->getMatrix());
+  // toRotation.set(PlaneNode->getMatrix());
   toRotation = qResult;
   cameraAttitude.slerp(SlerpSpeed * delta, cameraAttitude, toRotation);
   const osg::Vec3 eye = targetPosition + (cameraAttitude * offset);
@@ -882,8 +883,9 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   // First:
   for (int i = 0; i < 15; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
-    first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
-                                            Random(50, 250)));
+    // first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
+    //                                         Random(50, 250)));
+    first->setMatrix(osg::Matrix::translate(0, 150, 0));
     first->addChild(templateEnnemy);
 
     osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
@@ -900,7 +902,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osgDB::readNodeFile("../media/ZincBalloon.osgt");
 
   // First:
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < 0; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
     first->setMatrix(osg::Matrix::translate(
       Random(-150, 150), Random(-150, 150), Random(-150, 150)));

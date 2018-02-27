@@ -138,7 +138,8 @@ inline osg::Vec3
 limit(const osg::Vec3& vec, const float maxSize)
 {
   if (vec.length() <= maxSize) return vec;
-  return vec * (1 - maxSize / vec.length());
+  //return vec * (1 - maxSize / vec.length());
+  return normalize(vec) * maxSize;
 }
 
 /**
@@ -146,7 +147,7 @@ limit(const osg::Vec3& vec, const float maxSize)
  * number if A face away B
  */
 inline float
-facing(const osg::Vec3& A, const osg::Vec3& B, const osg::Vec3 directionOfA)
+facing(const osg::Vec3& A, const osg::Vec3& directionOfA, const osg::Vec3& B)
 {
   const osg::Vec3 aToB   = normalize(B - A);
   const float     facing = aToB * normalize(directionOfA);

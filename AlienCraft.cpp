@@ -29,6 +29,7 @@
 #include "ParticleObjects.h"
 #include "SceneManager.h"
 #include "Utils.h"
+#include <osg/PositionAttitudeTransform>
 
 namespace Soleil {
 
@@ -37,8 +38,8 @@ namespace Soleil {
     , force(0.0f, 0.0f, 0.0f)
     , friction(0.00f) // No friction
     , mass(1.0f)
-    , maxSpeed(4.0f)
-    , maxForce(1.0f)
+    , maxSpeed(10.0f) // 10 is a bit below player speed
+    , maxForce(.1f)
     , fireRate(1.0f / 2.0f) // Two fire per second
     , previousTime(0.0f)
     , lastShootTime(0.0f)
@@ -62,25 +63,76 @@ namespace Soleil {
     constexpr float Facing     = 0.98f;
 
     // --- Compute behavior --------------------------------------
-    const osg::NodePath playerPath =
-      SceneManager::GetNodePath(ConstHash("Player"));
-    const osg::Vec3 target  = playerPath.back()->getBound().center();
+    const osg::ref_ptr<osg::PositionAttitudeTransform> playerNode =
+      SceneManager::GetNodePath(ConstHash("Player"))
+        .back()
+        ->asTransform()
+        ->asPositionAttitudeTransform();
+    const osg::Vec3 target  = playerNode->getPosition();
     const osg::Vec3 current = node->getMatrix().getTrans();
-    //const osg::Vec3 playerDirection = visitor->getFrameStamp()->getV
-    
+    const osg::Vec3 playerDirection =
+      playerNode->getAttitude() * osg::Vec3(0, 1, 0);
+
     const bool isPlayerInRange = (target - current).length2() < ChaseRange;
-    // const bool isPlayerFacingMe =
-    //   facing(target, current, PlayerDirection) < Facing;
+    const bool isPlayerFacingMe =
+      facing(target, playerDirection, current) > Facing;
 
-    osg::Vec3 desired  = normalize(target - current) * maxSpeed;
-    osg::Vec3 steering = limit(desired - velocity, maxForce);
-
-    force = steering;
-
-    // Compute Physics -------------------------------------------
     const float deltaTime =
       visitor->getFrameStamp()->getSimulationTime() - previousTime;
 
+    if (isPlayerInRange && isPlayerFacingMe) {
+      const osg::Vec3 desired =
+        normalize(playerDirection) * maxSpeed; // TODO: Add Some randomeness
+      const osg::Vec3 steering = limit(desired - velocity, maxForce);
+      // const osg::Vec3 steering = desired;
+      force += steering;
+
+      SOLEIL__LOGGER_DEBUG("PlayerIsInRange && PlayerFacingMe => ", steering);
+
+    } else if (isPlayerInRange) {
+      const osg::Vec3 desired  = normalize(target - current) * maxSpeed;
+
+      // if ((velocity * desired) < 0.0f) {
+      // 	const float length = desired.length();
+	
+      // }
+      
+      const osg::Vec3 steering = limit(desired - velocity, maxForce);
+      // const osg::Vec3 steering = desired - velocity;
+      force = steering;
+
+      SOLEIL__LOGGER_DEBUG("PlayerIsInRange => limite(desired(", desired,
+                           ") - velocity(", velocity, "), ...) = steering(",
+                           steering, ")");
+
+      // Shoot the player if close enough --------------------------------------
+      lastShootTime += deltaTime;
+      if (lastShootTime >= fireRate) {
+        // TODO: Optimize already computed
+        const osg::Vec3 targetToCraft = target - current;
+        const float     facing = normalize(targetToCraft) * normalize(velocity);
+        // SOLEIL__LOGGER_DEBUG("FACING: ", facing);
+        if (targetToCraft.length() < FireRange && facing > Facing) {
+
+          const osg::Vec3 normalizedVelocity = normalize(velocity);
+          const osg::Vec3 gun =
+            current + normalizedVelocity * node->getBound().radius() * 1.1f;
+          // To avoid the alien craft destruct itself when shooting;
+
+          ShootEmitter::EmitAlienShoot(gun, normalizedVelocity * 100.0f);
+        }
+        lastShootTime = 0.0f;
+      }
+
+    } else {
+      osg::Vec3 desired  = normalize(target - current) * maxSpeed;
+      osg::Vec3 steering = limit(desired - velocity, maxForce);
+
+      SOLEIL__LOGGER_DEBUG("Steering: ", steering);
+      force += steering;
+    }
+
+    // Compute Physics -------------------------------------------
     const osg::Vec3 acceleration = force / mass;
 
     velocity += acceleration;
@@ -91,43 +143,41 @@ namespace Soleil {
       velocity.z() *= std::pow(friction * mass, deltaTime);
     }
 
-    osg::Quat q;
-    q.makeRotate(osg::Vec3(0, 1, 0), velocity);
-    osg::Matrix m = node->getMatrix();
-    m.setRotate(q);
-    // node->setMatrix(m * osg::Matrix::translate(velocity * deltaTime));
-    m *= osg::Matrix::translate(velocity * deltaTime);
+    if (velocity.length2() > 0.0f) {
+// TODO: Orient the craft event if velocity == 0
+#if 0
+      osg::Quat q;
+      q.makeRotate(osg::Vec3(0, 1, 0), velocity);
+#else
+      osg::Vec3 new_forward = normalize(velocity);
+      osg::Vec3 approximate_up(0, 0, 1);
+      osg::Vec3 new_side = new_forward ^ approximate_up; // cross product
+      osg::Vec3 new_up   = new_forward ^ new_side;       // cross product
+      osg::Quat q;
+      q.makeRotate(osg::Vec3(0, 1, 0), new_forward);
+#endif
+      osg::Matrix m = node->getMatrix();
+      m.setRotate(q); //   * deltaTime
+      m *= osg::Matrix::translate(velocity * deltaTime);
 
-    const osg::Vec3 nextPosition = m.getTrans();
-    osg::Vec3       collisionNormal;
+// TODO: Restore collistion
+#if 0
+      const osg::Vec3 nextPosition = m.getTrans();
+      osg::Vec3       collisionNormal;
 
-    if (Soleil::SceneManager::SegmentCollision(
-          node->getMatrix().getTrans(), nextPosition, node, &collisionNormal)) {
+      if (Soleil::SceneManager::SegmentCollision(node->getMatrix().getTrans(),
+                                                 nextPosition, node,
+                                                 &collisionNormal)) {
 
-      osg::NodePath p = visitor->getNodePath();
-      Soleil::EventManager::Emit(
-        std::make_shared<Soleil::EventDestructObject>(p));
-    } else {
-      node->setMatrix(m);
-    }
-
-    // Shoot the player if close enough ----------------------------------------
-    lastShootTime += deltaTime;
-    if (lastShootTime >= fireRate) {
-      const osg::Vec3 targetToCraft = target - current;
-      const float     facing = normalize(targetToCraft) * normalize(velocity);
-      // SOLEIL__LOGGER_DEBUG("FACING: ", facing);
-      if (targetToCraft.length() < FireRange && facing > Facing) {
-        // TODO: Limit the number of shoot
-
-        const osg::Vec3 normalizedVelocity = normalize(velocity);
-        const osg::Vec3 gun =
-          current + normalizedVelocity * node->getBound().radius() * 1.1f;
-        // To avoid the alien craft destruct itself when shooting;
-
-        ShootEmitter::EmitAlienShoot(gun, normalizedVelocity * 100.0f);
+        osg::NodePath p = visitor->getNodePath();
+        Soleil::EventManager::Emit(
+          std::make_shared<Soleil::EventDestructObject>(p));
+      } else {
+        node->setMatrix(m);
       }
-      lastShootTime = 0.0f;
+#else
+      node->setMatrix(m);
+#endif
     }
 
     previousTime = visitor->getFrameStamp()->getSimulationTime();

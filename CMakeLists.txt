@@ -26,7 +26,7 @@ find_package(OpenSceneGraph REQUIRED osgDB osgUtil osgViewer osgGA osgParticle) 
 #   ${OPENSCENEGRAPH_PLUGINS_DIR}/libosgdb_osg.a
 #   ${OPENSCENEGRAPH_PLUGINS_DIR}/libosgdb_rgb.a
 #   ${OPENSCENEGRAPH_PLUGINS_DIR}/libosgdb_serializers_osg.a
-  
+
 #   ${OPENSCENEGRAPH_PLUGINS_DIR}/libosgdb_osg.a
 #   ${OPENSCENEGRAPH_LIBRARIES_DIR}/libosg.a
 #   ${OPENSCENEGRAPH_LIBRARIES_DIR}/libosgViewer.a
@@ -54,10 +54,8 @@ include_directories(
   ${OPENSCENEGRAPH_INCLUDE_DIRS}
   )
 
-add_executable(zinc-osg
-  main.cpp
+SET(ZINC_ENGINE_SRC
   easing.c
-  
   SkyBox.cpp
   Logger.cpp
   ShootTracer.cpp
@@ -69,9 +67,25 @@ add_executable(zinc-osg
   ParticleObjects.cpp
   )
 
+add_executable(zinc-osg
+  main.cpp
+
+  ${ZINC_ENGINE_SRC}
+  )
+
 
 target_link_libraries(zinc-osg
   ${OPENSCENEGRAPH_LIBRARIES}
   )
 
 
+add_executable(steering
+  test/steering.cpp
+
+  ${ZINC_ENGINE_SRC}
+  )
+target_include_directories(steering PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_link_libraries(steering
+  ${OPENSCENEGRAPH_LIBRARIES}
+  )
