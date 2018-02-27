@@ -40,6 +40,7 @@ namespace Soleil {
     float mass;
     float maxSpeed;
     float maxForce;
+    float maxRotation;
     float fireRate;
     
   private:

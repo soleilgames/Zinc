@@ -40,6 +40,7 @@ namespace Soleil {
     , mass(1.0f)
     , maxSpeed(10.0f) // 10 is a bit below player speed
     , maxForce(.1f)
+    , maxRotation(0.5f)
     , fireRate(1.0f / 2.0f) // Two fire per second
     , previousTime(0.0f)
     , lastShootTime(0.0f)
@@ -80,30 +81,44 @@ namespace Soleil {
     const float deltaTime =
       visitor->getFrameStamp()->getSimulationTime() - previousTime;
 
+    osg::Vec3 desired(0, 0, 0);
     if (isPlayerInRange && isPlayerFacingMe) {
-      const osg::Vec3 desired =
+      desired =
         normalize(playerDirection) * maxSpeed; // TODO: Add Some randomeness
-      const osg::Vec3 steering = limit(desired - velocity, maxForce);
-      // const osg::Vec3 steering = desired;
-      force += steering;
-
-      SOLEIL__LOGGER_DEBUG("PlayerIsInRange && PlayerFacingMe => ", steering);
-
-    } else if (isPlayerInRange) {
-      const osg::Vec3 desired  = normalize(target - current) * maxSpeed;
 
       // if ((velocity * desired) < 0.0f) {
-      // 	const float length = desired.length();
-	
-      // }
-      
-      const osg::Vec3 steering = limit(desired - velocity, maxForce);
-      // const osg::Vec3 steering = desired - velocity;
-      force = steering;
+      //   const float length = desired.length();
 
-      SOLEIL__LOGGER_DEBUG("PlayerIsInRange => limite(desired(", desired,
-                           ") - velocity(", velocity, "), ...) = steering(",
-                           steering, ")");
+      //   // TODO: Max possible rotation
+      //   desired = normalize(velocity) * length;
+      //   desired = osg::Quat(osg::PI_2, osg::Vec3(0, 1, 0)) * desired;
+      // }
+
+      // const osg::Vec3 steering = limit(desired - velocity, maxForce);
+      // const osg::Vec3 steering = desired;
+      // force += steering;
+
+      // SOLEIL__LOGGER_DEBUG("PlayerIsInRange && PlayerFacingMe => ",
+      // steering);
+
+    } else if (isPlayerInRange) {
+      desired = normalize(target - current) * maxSpeed;
+
+      // if ((velocity * desired) < 0.0f) {
+      //   const float length = desired.length();
+
+      //   // TODO: Max possible rotation
+      //   desired = normalize(velocity) * length;
+      //   desired = osg::Quat(osg::PI_2, osg::Vec3(0, 1, 0)) * desired;
+      // }
+
+      // const osg::Vec3 steering = limit(desired - velocity, maxForce);
+      // // const osg::Vec3 steering = desired - velocity;
+      // force = steering;
+
+      // SOLEIL__LOGGER_DEBUG("PlayerIsInRange => limite(desired(", desired,
+      //                      ") - velocity(", velocity, "), ...) = steering(",
+      //                      steering, ")");
 
       // Shoot the player if close enough --------------------------------------
       lastShootTime += deltaTime;
@@ -125,11 +140,42 @@ namespace Soleil {
       }
 
     } else {
-      osg::Vec3 desired  = normalize(target - current) * maxSpeed;
+      osg::Vec3 desired = normalize(target - current) * maxSpeed;
+
+      // if ((velocity * desired) < 0.0f) {
+      // 	const float length = desired.length();
+
+      // 	// TODO: Max possible rotation
+      // 	desired = normalize(velocity) * length;
+      // 	desired = osg::Quat(osg::PI_2, osg::Vec3(0, 1, 0)) * desired;
+      // }
+
+      // osg::Vec3 steering = limit(desired - velocity, maxForce);
+
+      // SOLEIL__LOGGER_DEBUG("Steering: ", steering);
+      // force += steering;
+    }
+
+    SOLEIL__LOGGER_DEBUG("Desired (before rotation): ", desired);
+    if (desired.length2() > 0.0f) {
+      const float dot = (velocity * desired);
+      SOLEIL__LOGGER_DEBUG("Dot: ", desired,
+                           ". Map: ", map(-1.0f, 1.0f, osg::PIf, 0.0f, dot));
+      // If the vehicle has no velocity, allows an abrupt turn
+      if (velocity.length2() > 0.0f &&
+          map(-1.0f, 1.0f, osg::PIf, 0.0f, dot) > maxRotation) {
+        const float length = desired.length();
+
+        // TODO: Not always turn left
+        desired = normalize(velocity) * length;
+        desired = osg::Quat(maxRotation, osg::Vec3(0, 1, 0)) * desired;
+        SOLEIL__LOGGER_DEBUG("Desired (after rotation): ", desired);
+      }
+
       osg::Vec3 steering = limit(desired - velocity, maxForce);
 
       SOLEIL__LOGGER_DEBUG("Steering: ", steering);
-      force += steering;
+      force = steering;
     }
 
     // Compute Physics -------------------------------------------

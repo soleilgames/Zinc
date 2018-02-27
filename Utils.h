@@ -138,7 +138,7 @@ inline osg::Vec3
 limit(const osg::Vec3& vec, const float maxSize)
 {
   if (vec.length() <= maxSize) return vec;
-  //return vec * (1 - maxSize / vec.length());
+  // return vec * (1 - maxSize / vec.length());
   return normalize(vec) * maxSize;
 }
 
@@ -152,6 +152,15 @@ facing(const osg::Vec3& A, const osg::Vec3& directionOfA, const osg::Vec3& B)
   const osg::Vec3 aToB   = normalize(B - A);
   const float     facing = aToB * normalize(directionOfA);
   return facing;
+}
+
+/**
+ * While X is in range [A, B], returns its corresponding value in range [C, D]
+ */
+inline float
+map(const float A, const float B, const float C, const float D, const float X)
+{
+  return (X - A) / (B - A) * (D - C) + C;
 }
 
 #endif /* SOLEIL__UTILS_H_ */

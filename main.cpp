@@ -881,11 +881,11 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  for (int i = 0; i < 15; ++i) {
+  for (int i = 0; i < 25; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
-    // first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
-    //                                         Random(50, 250)));
-    first->setMatrix(osg::Matrix::translate(0, 150, 0));
+    first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
+                                            Random(50, 250)));
+    //first->setMatrix(osg::Matrix::translate(0, 150, 0));
     first->addChild(templateEnnemy);
 
     osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
