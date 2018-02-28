@@ -36,16 +36,41 @@ namespace Soleil {
   public:
     osg::Vec3 velocity;
     osg::Vec3 force;
-    float friction;
-    float mass;
-    float maxSpeed;
-    float maxForce;
-    float maxRotation;
-    float fireRate;
-    
+    float     friction;
+    float     mass;
+    float     maxSpeed;
+    float     maxForce;
+    float     maxRotation;
+    float     fireRate;
+
   private:
     double previousTime;
     double lastShootTime;
+    double remainingActionTime;
+    int    behavior;
+
+    enum
+    {
+      AlienCraftNoBehavior,
+      AlienCraftChasePlayer,
+      AlienCraftFlee,
+      AlienCraftGoto
+    };
+
+  private:
+    osg::Vec3 chasePlayer(const osg::Vec3& targetToCraft,
+                          const osg::Vec3& position, const float deltaTime,
+                          osg::Node* node);
+    osg::Vec3 flee(const osg::Vec3& playerDirection);
+    osg::Vec3 goTo(const osg::Vec3& targetToCraft);
+
+  public:
+    static constexpr float ChaseRange =
+      200.0f * 200.0f; // (we are using lenght2)
+    static constexpr float FireRange = 50.0f * 50.0f;
+    static constexpr float Avoidance =
+      20.0f * 20.0f; // TODO: Use Avoidance behavior
+    static constexpr float Facing = 0.98f;
   };
 
 } // Soleil

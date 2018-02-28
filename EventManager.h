@@ -72,6 +72,8 @@ namespace Soleil {
 
     void delay(double time, EventPtr event);
 
+    void delay(double time, EventListener event);
+
   private:
     typedef std::vector<EventListener> EventListenerList;
     std::map<EventType, EventListenerList> registeredListeners;
@@ -81,7 +83,8 @@ namespace Soleil {
     unsigned int activeQueue;
 
   private: // Delayed
-    std::vector<std::pair<double, EventPtr>> delayed;
+    std::vector<std::pair<double, EventPtr>>      delayed;
+    std::vector<std::pair<double, EventListener>> delayedFunction;
 
   public:
     static void Init();
@@ -89,6 +92,7 @@ namespace Soleil {
     static void Emit(EventPtr event);
     static void ProcessEvents(double deltaTime);
     static void Delay(double time, EventPtr event);
+    static void Delay(double time, EventListener event);
   };
 
 } // Soleil

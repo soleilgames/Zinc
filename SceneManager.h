@@ -41,6 +41,7 @@ namespace Soleil {
   public: // Scene lookup
     static osg::NodePath GetNodePath(ObjectID id);
     static void RegisterNodePath(ObjectID, osg::NodePath nodePath);
+    static osg::ref_ptr<osg::Group> GetRoot();
 
   protected:
     std::map<ObjectID, osg::NodePath> nodesPath;

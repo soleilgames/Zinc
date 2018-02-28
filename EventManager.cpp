@@ -37,6 +37,17 @@ namespace Soleil {
     queues[activeQueue].push_front(event);
   }
 
+  namespace {
+    class EmptyEvent : public Event
+    {
+    public:
+      EmptyEvent()
+        : Event(0)
+      {
+      }
+    };
+  }
+  
   void EventManager::processEvents(double deltaTime)
   {
     // Swap the acrive queue and clear it
@@ -57,11 +68,24 @@ namespace Soleil {
       }
     }
 
-    for (auto i = delayed.begin(); i < delayed.end(); /**/) {
+    // Delayed events --------------------------------------
+    for (auto i = delayed.begin(); i != delayed.end(); /**/) {
       i->first = i->first - deltaTime;
-      if (i->first <= 0) {
+      if (i->first <= 0.0f) {
         emit(i->second);
         delayed.erase(i);
+      } else {
+        ++i;
+      }
+    }
+
+    // Delayed functions -------------------------------------
+    EmptyEvent empty;
+    for (auto i = delayedFunction.begin(); i != delayedFunction.end(); /**/) {
+      i->first = i->first - deltaTime;
+      if (i->first <= 0.0f) {
+        i->second(empty);
+        delayedFunction.erase(i);
       } else {
         ++i;
       }
@@ -71,6 +95,11 @@ namespace Soleil {
   void EventManager::delay(double time, EventPtr event)
   {
     delayed.push_back(std::make_pair(time, event));
+  }
+
+  void EventManager::delay(double time, EventListener event)
+  {
+    delayedFunction.push_back(std::make_pair(time, event));
   }
 
   // ---------------------------------------------------------------------------
@@ -105,6 +134,13 @@ namespace Soleil {
   }
 
   void EventManager::Delay(double time, EventPtr event)
+  {
+    assert(mainEventManager && "Event Manager not initialized");
+
+    mainEventManager->delay(time, event);
+  }
+
+  void EventManager::Delay(double time, EventListener event)
   {
     assert(mainEventManager && "Event Manager not initialized");
 

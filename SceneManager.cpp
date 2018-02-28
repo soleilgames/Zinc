@@ -213,6 +213,11 @@ namespace Soleil {
     sceneManager->nodesPath[id] = nodePath;
   }
 
+  osg::ref_ptr<osg::Group> SceneManager::GetRoot()
+  {
+    return sceneManager->sceneRoot;
+  }
+
   void SceneManager::RegisterParticleSystem(
     ObjectID id, osg::ref_ptr<osgParticle::ParticleSystem> system)
   {

@@ -881,7 +881,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  for (int i = 0; i < 25; ++i) {
+  for (int i = 0; i < 3; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
     first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
                                             Random(50, 250)));

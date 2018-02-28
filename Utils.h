@@ -154,6 +154,25 @@ facing(const osg::Vec3& A, const osg::Vec3& directionOfA, const osg::Vec3& B)
   return facing;
 }
 
+inline osg::Quat
+quatLookAt(const osg::Vec3& position, const osg::Vec3& center,
+           const osg::Vec3& up)
+{
+  const float dot = position * center;
+  if (osg::absolute(dot) - (-1.0f) < 0.000001f) {
+    // Center is in our back we need to returns a full 180 degrees rotation
+    return osg::Quat(osg::PIf, up);
+  }
+  if (osg::absolute(dot) - (1.0f) < 0.000001f) {
+    // Center is front, no need to rotate
+    return osg::Quat();
+  }
+
+  const float rotationAngle = std::acos(dot);
+  osg::Vec3   rotationAxis  = normalize(position ^ center);
+  return osg::Quat(rotationAngle, rotationAxis);
+}
+
 /**
  * While X is in range [A, B], returns its corresponding value in range [C, D]
  */
