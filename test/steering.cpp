@@ -151,10 +151,10 @@ main(int // argc
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  for (int i = 0; i < 50; ++i) {
+  for (int i = 0; i < 10; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
-    first->setMatrix(osg::Matrix::translate(Random(-50, 50), Random(-50, 50),
-                                            Random(-50, 50)));
+    first->setMatrix(osg::Matrix::translate(
+      Random(-150, 150), Random(-150, 150), Random(-150, 150)));
     // first->setMatrix(osg::Matrix::translate(30, 00, 00));
     first->addChild(templateEnnemy);
 
@@ -165,27 +165,6 @@ main(int // argc
   }
 
   root->addChild(ennemies);
-
-  // Debug tools
-  // {
-  //   osg::ref_ptr<osg::Node> taxis =
-  //   osgDB::readNodeFile("../media/taxis.osgt");
-
-  //   // Desired ---
-  //   osg::ref_ptr<osg::MatrixTransform> desiredDir = new osg::MatrixTransform;
-  //   desiredDir->addChild(Soleil::GetNodeByName(*taxis, "Direction"));
-  //   root->addChild(desiredDir);
-  //   // Velocity ---
-  //   osg::ref_ptr<osg::MatrixTransform> velocityDir = new
-  //   osg::MatrixTransform;
-  //   velocityDir->addChild(Soleil::GetNodeByName(*taxis, "Normal"));
-  //   root->addChild(velocityDir);
-  //   // Steering ---
-  //   osg::ref_ptr<osg::MatrixTransform> steeringDir = new
-  //   osg::MatrixTransform;
-  //   steeringDir->addChild(Soleil::GetNodeByName(*taxis, "Reflect"));
-  //   root->addChild(steeringDir);
-  // }
 
   viewer.realize();
   osg::ref_ptr<DebugTrackball> cam = new DebugTrackball;

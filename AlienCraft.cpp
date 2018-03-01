@@ -31,8 +31,9 @@
 #include "Utils.h"
 #include <osg/PositionAttitudeTransform>
 
-// Debug:
+// // TODO: remove Debug:
 #include <osgDB/ReadFile>
+//#define SOLEIL__DEBUG_STEERING 1
 
 namespace Soleil {
 
@@ -45,7 +46,7 @@ namespace Soleil {
     , mass(1.0f)
     , maxSpeed(10.0f) // 10 is a bit below player speed
     , maxForce(.1f)
-    , maxRotation(1.6f)     // 0.5 osg::PI_2f
+    , maxRotation(.6f)      // 0.5 osg::PI_2f
     , fireRate(1.0f / 2.0f) // Two fire per second
     , previousTime(0.0f)
     , lastShootTime(0.0f)
@@ -93,7 +94,11 @@ namespace Soleil {
     osg::Vec3 desired(0, 0, 0);
 
     if (behavior == AlienCraftNoBehavior) {
-      if ((isPlayerInRange && isPlayerFacingMe) || isPlayerInTooClose) {
+      if (
+#if not defined(SOLEIL__DEBUG_STEERING)
+        (isPlayerInRange && isPlayerFacingMe) ||
+#endif
+        isPlayerInTooClose) {
         behavior            = AlienCraftFlee;
         remainingActionTime = Random(0.5f, 2.0f);
       } else if (isPlayerInRange) {
@@ -106,11 +111,11 @@ namespace Soleil {
     }
     switch (behavior) {
       case AlienCraftChasePlayer:
-        //SOLEIL__LOGGER_DEBUG("CHASE:", remainingActionTime);
+        // SOLEIL__LOGGER_DEBUG("CHASE:", remainingActionTime);
         desired = chasePlayer(targetToCraft, current, deltaTime, node);
         break;
       case AlienCraftFlee:
-        //SOLEIL__LOGGER_DEBUG("FLEE:", remainingActionTime);
+        SOLEIL__LOGGER_DEBUG("FLEE:", remainingActionTime);
         desired = flee(playerDirection);
         break;
       case AlienCraftGoto: desired = goTo(targetToCraft); break;
@@ -124,16 +129,24 @@ namespace Soleil {
       // SOLEIL__LOGGER_DEBUG("Dot: ", dot,
       //                      ". Map: ", map(-1.0f, 1.0f, osg::PIf, 0.0f, dot));
       // If the vehicle has no velocity, allows an abrupt turn
-      if (velocity.length2() > 0.0f &&
-          map(-1.0f, 1.0f, osg::PIf, 0.0f, dot) > maxRotation) {
-        const float length = desired.length();
+      // if (velocity.length2() > 0.0f &&
+      //     map(-1.0f, 1.0f, osg::PIf, 0.0f, dot) > maxRotation) {
+      if (velocity.length2() > 0.0f) {
+        const float angle = std::acos(
+          dot / (velocity.length(), desired.length())); // TODO: use map?
+        if (std::abs(angle) > maxRotation) {
+          const float     length = desired.length();
+          const osg::Vec3 axis =
+            normalize(normalize(desired) ^
+                      normalize(velocity)); // TODO: Normalize the normalization
 
-        // TODO: Not always turn left
-        desired = normalize(velocity) * length;
-        // desired = osg::Quat(maxRotation, osg::Vec3(0, 0, 1)) * desired;
-        desired = osg::Matrix::rotate(maxRotation, 0, 0, 1) * desired;
+          // TODO: Not always turn left
+          desired = normalize(velocity) * length;
+          // desired = osg::Quat(maxRotation, osg::Vec3(0, 0, 1)) * desired;
+          desired = osg::Matrix::rotate(maxRotation, axis) * desired;
 
-        //SOLEIL__LOGGER_DEBUG("Desired (after rotation): ", desired);
+          // SOLEIL__LOGGER_DEBUG("Desired (after rotation): ", desired);
+        }
       }
 
       osg::Vec3 steering = limit(desired - velocity, maxForce);
@@ -154,54 +167,55 @@ namespace Soleil {
       //   SOLEIL__LOGGER_DEBUG("Steering (after rotation): ", steering);
       // }
 
-      //SOLEIL__LOGGER_DEBUG("Steering: ", steering);
+      // SOLEIL__LOGGER_DEBUG("Steering: ", steering);
       force = steering;
     }
 
-    // TODO: remove test:
-    // {
-    //   assert(osg::Quat().zeroRotation());
-    //   static osg::ref_ptr<osg::MatrixTransform> desiredDir;
-    //   static osg::ref_ptr<osg::MatrixTransform> velocityDir;
-    //   static osg::ref_ptr<osg::MatrixTransform> steeringDir;
-    //   if (!desiredDir) {
-    //     // Desired ---
-    //     desiredDir = new osg::MatrixTransform;
-    //     desiredDir->setNodeMask(desiredDir->getNodeMask() &
-    //                             ~SceneManager::Mask::Collision);
-    //     desiredDir->addChild(Soleil::GetNodeByName(*taxis, "Direction"));
-    //     // Velocity ---
-    //     velocityDir = new osg::MatrixTransform;
-    //     velocityDir->setNodeMask(velocityDir->getNodeMask() &
-    //                              ~SceneManager::Mask::Collision);
-    //     velocityDir->addChild(Soleil::GetNodeByName(*taxis, "Normal"));
-    //     // Steering ---
-    //     steeringDir = new osg::MatrixTransform;
-    //     steeringDir->setNodeMask(steeringDir->getNodeMask() &
-    //                              ~SceneManager::Mask::Collision);
-    //     steeringDir->addChild(Soleil::GetNodeByName(*taxis, "Reflect"));
-    //     // Update ---
-    //     EventManager::Delay(0.0f, [](Event& /*e*/) {
-    //       SceneManager::GetRoot()->addChild(desiredDir);
-    //       SceneManager::GetRoot()->addChild(velocityDir);
-    //       SceneManager::GetRoot()->addChild(steeringDir);
-    //     });
-    //   } else {
-    //     desiredDir->setMatrix(osg::Matrix::rotate(osg::Vec3(0, 1, 0),
-    //     desired) *
-    //                           osg::Matrix::translate(current));
-    //     if (velocity.length2() > 0.0f) {
-    //       velocityDir->setMatrix(
-    //         osg::Matrix::rotate(osg::Vec3(0, 1, 0), velocity) *
-    //         osg::Matrix::translate(current));
-    //     }
-    //     if (force.length2() > 0.0f) {
-    //       steeringDir->setMatrix(
-    //         osg::Matrix::rotate(osg::Vec3(0, 1, 0), force) *
-    //         osg::Matrix::translate(current));
-    //     }
-    //   }
-    // }
+// TODO: remove test:
+#ifdef SOLEIL__DEBUG_STEERING
+    {
+      assert(osg::Quat().zeroRotation());
+      static osg::ref_ptr<osg::MatrixTransform> desiredDir;
+      static osg::ref_ptr<osg::MatrixTransform> velocityDir;
+      static osg::ref_ptr<osg::MatrixTransform> steeringDir;
+      if (!desiredDir) {
+        // Desired ---
+        desiredDir = new osg::MatrixTransform;
+        desiredDir->setNodeMask(desiredDir->getNodeMask() &
+                                ~SceneManager::Mask::Collision);
+        desiredDir->addChild(Soleil::GetNodeByName(*taxis, "Direction"));
+        // Velocity ---
+        velocityDir = new osg::MatrixTransform;
+        velocityDir->setNodeMask(velocityDir->getNodeMask() &
+                                 ~SceneManager::Mask::Collision);
+        velocityDir->addChild(Soleil::GetNodeByName(*taxis, "Normal"));
+        // Steering ---
+        steeringDir = new osg::MatrixTransform;
+        steeringDir->setNodeMask(steeringDir->getNodeMask() &
+                                 ~SceneManager::Mask::Collision);
+        steeringDir->addChild(Soleil::GetNodeByName(*taxis, "Reflect"));
+        // Update ---
+        EventManager::Delay(0.0f, [](Event& /*e*/) {
+          SceneManager::GetRoot()->addChild(desiredDir);
+          SceneManager::GetRoot()->addChild(velocityDir);
+          SceneManager::GetRoot()->addChild(steeringDir);
+        });
+      } else {
+        desiredDir->setMatrix(osg::Matrix::rotate(osg::Vec3(0, 1, 0), desired) *
+                              osg::Matrix::translate(current));
+        if (velocity.length2() > 0.0f) {
+          velocityDir->setMatrix(
+            osg::Matrix::rotate(osg::Vec3(0, 1, 0), velocity) *
+            osg::Matrix::translate(current));
+        }
+        if (force.length2() > 0.0f) {
+          steeringDir->setMatrix(
+            osg::Matrix::rotate(osg::Vec3(0, 1, 0), force) *
+            osg::Matrix::translate(current));
+        }
+      }
+    }
+#endif
 
     // Compute Physics -------------------------------------------
     const osg::Vec3 acceleration = force / mass;
@@ -227,6 +241,8 @@ namespace Soleil {
       osg::Vec3 new_up   = new_forward ^ new_side;       // cross product
       osg::Quat q;
       q.makeRotate(osg::Vec3(0, 1, 0), new_forward);
+// osg::Quat q = quatLookAt(osg::Vec3(0, 1, 0), new_forward, new_up);
+// const float rotation =
 #endif
       osg::Matrix m = node->getMatrix();
       m.setRotate(q); //   * deltaTime

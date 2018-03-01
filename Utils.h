@@ -25,6 +25,7 @@
 #include <osg/Group>
 #include <osg/Node>
 #include <osg/NodeVisitor>
+#include <random>
 #include <string>
 
 #include <iostream>
@@ -121,9 +122,9 @@ template <typename T>
 T
 Random(T minValue, T maxValue)
 {
-  //
-  return static_cast<T>(rand() + minValue) /
-         (static_cast<T>(RAND_MAX / maxValue));
+  std::random_device rd;        // TODO: Use same device everywhere
+  std::mt19937       gen(rd()); // TODO: Allow pure true randomness
+  return mix(minValue, maxValue, std::generate_canonical<double, 1>(gen));
 }
 
 inline osg::Vec3
@@ -169,8 +170,12 @@ quatLookAt(const osg::Vec3& position, const osg::Vec3& center,
   }
 
   const float rotationAngle = std::acos(dot);
-  osg::Vec3   rotationAxis  = normalize(position ^ center);
-  return osg::Quat(rotationAngle, rotationAxis);
+  // const float     rotationAngle = dot;
+  const osg::Vec3 rotationAxis = normalize(position ^ center);
+  osg::Quat       t;
+  t.makeRotate(rotationAngle, rotationAxis);
+  return t;
+  // return osg::Quat(rotationAngle, rotationAxis);
 }
 
 /**
