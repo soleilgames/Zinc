@@ -839,7 +839,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   ///////////////////////////////////////////
   PlayerNode                                 = plane;
   osg::ref_ptr<osg::MatrixTransform> centerg = new osg::MatrixTransform;
-  centerg->addChild(osgDB::readNodeFile("../media/axes.osgt"));
+  // centerg->addChild(osgDB::readNodeFile("../media/axes.osgt"));
   centerg->setMatrix(
     osg::Matrix::translate(PlayerNode->computeBound().center()));
   PlayerNode->addChild(centerg);
@@ -885,7 +885,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
     first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
                                             Random(50, 250)));
-    //first->setMatrix(osg::Matrix::translate(0, 150, 0));
+    // first->setMatrix(osg::Matrix::translate(0, 150, 0));
     first->addChild(templateEnnemy);
 
     osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;

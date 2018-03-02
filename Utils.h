@@ -128,6 +128,24 @@ Random(T minValue, T maxValue)
 }
 
 inline osg::Vec3
+VectorFront()
+{
+  return osg::Vec3(0, 1, 0);
+}
+
+inline osg::Vec3
+VectorUp()
+{
+  return osg::Vec3(0, 0, 1);
+}
+
+inline osg::Vec3
+VectorRight()
+{
+  return osg::Vec3(1, 0, 0);
+}
+
+inline osg::Vec3
 normalize(const osg::Vec3& node)
 {
   osg::Vec3 normalized = node;
@@ -156,26 +174,67 @@ facing(const osg::Vec3& A, const osg::Vec3& directionOfA, const osg::Vec3& B)
 }
 
 inline osg::Quat
-quatLookAt(const osg::Vec3& position, const osg::Vec3& center,
-           const osg::Vec3& up)
+quatLookAt(const osg::Vec3& center)
 {
-  const float dot = position * center;
+  const float dot = VectorFront() * center;
   if (osg::absolute(dot) - (-1.0f) < 0.000001f) {
     // Center is in our back we need to returns a full 180 degrees rotation
-    return osg::Quat(osg::PIf, up);
+    return osg::Quat(osg::PIf, VectorUp());
   }
-  if (osg::absolute(dot) - (1.0f) < 0.000001f) {
+  if (osg::absolute(dot - (1.0f)) < 0.000001f) {
     // Center is front, no need to rotate
     return osg::Quat();
   }
+  const float     angle = std::acos(dot);
+  const osg::Vec3 axis  = normalize(VectorFront() ^ center);
+  return osg::Quat(angle, axis);
 
-  const float rotationAngle = std::acos(dot);
-  // const float     rotationAngle = dot;
-  const osg::Vec3 rotationAxis = normalize(position ^ center);
-  osg::Quat       t;
-  t.makeRotate(rotationAngle, rotationAxis);
-  return t;
-  // return osg::Quat(rotationAngle, rotationAxis);
+  // Paramerters:
+  // const osg::Vec3& position,
+  // const osg::Vec3& up
+  //
+  // const float dot = position * center;
+  // if (osg::absolute(dot) - (-1.0f) < 0.000001f) {
+  //   SOLEIL__LOGGER_DEBUG("BACK");
+  //   // Center is in our back we need to returns a full 180 degrees rotation
+  //   return osg::Quat(osg::PIf, up);
+  // }
+  // if (osg::absolute(dot) - (1.0f) < 0.000001f) {
+  //   SOLEIL__LOGGER_DEBUG("FRONT");
+  //   // Center is front, no need to rotate
+  //   return osg::Quat();
+  // }
+
+  // const float rotationAngle = std::acos(dot);
+  // // const float     rotationAngle = dot;
+  // const osg::Vec3 rotationAxis = normalize(osg::Vec3(0, 1, 0) ^ center);
+  // osg::Quat       t;
+  // t.makeRotate(rotationAngle, rotationAxis);
+  // return t;
+  // // return osg::Quat(rotationAngle, rotationAxis);
+}
+
+inline osg::Quat
+quatLookAt(const osg::Vec3& dir, const osg::Vec3& up)
+{
+  if (dir.length2() == 0.0f) {
+    assert(false && "Zero length direction in quatLookAt(const osg::Vec3& "
+                    "dir, const osg::Vec3& up)");
+    return osg::Quat();
+  }
+
+  if (up != dir) {
+    const osg::Vec3 v = dir + up * -(up * dir);
+    osg::Quat       q;
+    q.makeRotate_original(VectorFront(), v);
+    osg::Quat r;
+    r.makeRotate_original(v, dir);
+    return q * r; // * q;
+  }
+
+  osg::Quat q;
+  q.makeRotate(VectorFront(), dir);
+  return q;
 }
 
 /**

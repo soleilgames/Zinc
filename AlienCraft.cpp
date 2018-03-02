@@ -111,27 +111,19 @@ namespace Soleil {
     }
     switch (behavior) {
       case AlienCraftChasePlayer:
-        // SOLEIL__LOGGER_DEBUG("CHASE:", remainingActionTime);
         desired = chasePlayer(targetToCraft, current, deltaTime, node);
         break;
-      case AlienCraftFlee:
-        SOLEIL__LOGGER_DEBUG("FLEE:", remainingActionTime);
-        desired = flee(playerDirection);
-        break;
+      case AlienCraftFlee: desired = flee(playerDirection); break;
       case AlienCraftGoto: desired = goTo(targetToCraft); break;
     };
     remainingActionTime -= deltaTime;
     if (remainingActionTime <= 0.0f) behavior = AlienCraftNoBehavior;
 
-    // SOLEIL__LOGGER_DEBUG("Desired (before rotation): ", desired);
     if (desired.length2() > 0.0f) {
-      const float dot = (normalize(velocity) * normalize(desired));
-      // SOLEIL__LOGGER_DEBUG("Dot: ", dot,
-      //                      ". Map: ", map(-1.0f, 1.0f, osg::PIf, 0.0f, dot));
       // If the vehicle has no velocity, allows an abrupt turn
-      // if (velocity.length2() > 0.0f &&
-      //     map(-1.0f, 1.0f, osg::PIf, 0.0f, dot) > maxRotation) {
       if (velocity.length2() > 0.0f) {
+#if 1
+        const float dot   = (normalize(velocity) * normalize(desired));
         const float angle = std::acos(
           dot / (velocity.length(), desired.length())); // TODO: use map?
         if (std::abs(angle) > maxRotation) {
@@ -140,35 +132,22 @@ namespace Soleil {
             normalize(normalize(desired) ^
                       normalize(velocity)); // TODO: Normalize the normalization
 
-          // TODO: Not always turn left
           desired = normalize(velocity) * length;
-          // desired = osg::Quat(maxRotation, osg::Vec3(0, 0, 1)) * desired;
-          desired = osg::Matrix::rotate(maxRotation, axis) * desired;
-
-          // SOLEIL__LOGGER_DEBUG("Desired (after rotation): ", desired);
+          desired =
+            osg::Quat(-maxRotation, axis) * desired; // TODO: Why -maxRotation
+          // desired = osg::Matrix::rotate(maxRotation, axis) * desired;
         }
+#else
+        const float dot = (normalize(velocity) * normalize(desired));
+
+        const float fullSteerAngle = acos(dot) / maxRotation;
+        const float steerAngle     = Sign(dot) * fullSteerAngle;
+
+#endif
       }
 
       osg::Vec3 steering = limit(desired - velocity, maxForce);
-
-      // SOLEIL__LOGGER_DEBUG("Steering (before rotation): ", steering);
-      // const float dot = (normalize(velocity) * normalize(steering));
-      // SOLEIL__LOGGER_DEBUG("Dot: ", dot,
-      //                      ". Map: ", map(-1.0f, 1.0f, osg::PIf, 0.0f, dot));
-      // // If the vehicle has no velocity, allows an abrupt turn
-      // if (velocity.length2() > 0.0f &&
-      //     map(-1.0f, 1.0f, osg::PIf, 0.0f, dot) > maxRotation) {
-      //   const float length = steering.length();
-
-      //   // TODO: Not always turn left
-      //   steering = normalize(velocity) * length;
-      //   steering = osg::Quat(maxRotation, osg::Vec3(0, 0, 1)) * steering;
-
-      //   SOLEIL__LOGGER_DEBUG("Steering (after rotation): ", steering);
-      // }
-
-      // SOLEIL__LOGGER_DEBUG("Steering: ", steering);
-      force = steering;
+      force              = steering;
     }
 
 // TODO: remove test:
@@ -234,15 +213,25 @@ namespace Soleil {
       osg::Quat q;
       q.makeRotate(osg::Vec3(0, 1, 0), velocity);
 #else
-      // TODO: Fine tune the up vector
       osg::Vec3 new_forward = normalize(velocity);
       osg::Vec3 approximate_up(0, 0, 1);
       osg::Vec3 new_side = new_forward ^ approximate_up; // cross product
       osg::Vec3 new_up   = new_forward ^ new_side;       // cross product
-      osg::Quat q;
-      q.makeRotate(osg::Vec3(0, 1, 0), new_forward);
-// osg::Quat q = quatLookAt(osg::Vec3(0, 1, 0), new_forward, new_up);
-// const float rotation =
+      // osg::Quat q(0.0f, new_forward);
+      // q.makeRotate(0.0f, new_forward);
+      // osg::Quat q = quatLookAt(new_forward);  // good
+      // osg::Quat result = quatLookAt(new_forward); // good
+      // osg::Quat q =
+      //   osg::Quat(std::acos(osg::Vec3(new_forward.x(), new_forward.y(), 0.0f)
+      //   *
+      //                       VectorFront()),
+      //             VectorUp()) *
+      //   osg::Quat(
+      //     std::acos(osg::Vec3(0.0f, 0.0f, new_forward.z()) * VectorUp()),
+      //     VectorRight());
+      const osg::Quat q = quatLookAt(new_forward, VectorUp());
+// const osg::Quat q = quatLookAt(new_forward, normalize(new_up));
+
 #endif
       osg::Matrix m = node->getMatrix();
       m.setRotate(q); //   * deltaTime

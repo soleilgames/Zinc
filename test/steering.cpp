@@ -153,9 +153,10 @@ main(int // argc
   // First:
   for (int i = 0; i < 10; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
+    constexpr float                    Range = 50;
     first->setMatrix(osg::Matrix::translate(
-      Random(-150, 150), Random(-150, 150), Random(-150, 150)));
-    // first->setMatrix(osg::Matrix::translate(30, 00, 00));
+      Random(-Range, Range), Random(-Range, Range), Random(-Range, Range)));
+    // first->setMatrix(osg::Matrix::translate(30, 00, -30));
     first->addChild(templateEnnemy);
 
     osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
