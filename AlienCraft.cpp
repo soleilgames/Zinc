@@ -126,7 +126,6 @@ namespace Soleil {
     if (desired.length2() > 0.0f) {
       // If the vehicle has no velocity, allows an abrupt turn
       if (velocity.length2() > 0.0f) {
-#if 1
         const float dot   = (normalize(velocity) * normalize(desired));
         const float angle = std::acos(
           dot / (velocity.length(), desired.length())); // TODO: use map?
@@ -137,17 +136,8 @@ namespace Soleil {
                       normalize(velocity)); // TODO: Normalize the normalization
 
           desired = normalize(velocity) * length;
-          desired =
-            osg::Quat(-maxRotation, axis) * desired; // TODO: Why -maxRotation
-          // desired = osg::Matrix::rotate(maxRotation, axis) * desired;
+          desired = osg::Quat(-maxRotation, axis) * desired;
         }
-#else
-        const float dot = (normalize(velocity) * normalize(desired));
-
-        const float fullSteerAngle = acos(dot) / maxRotation;
-        const float steerAngle     = Sign(dot) * fullSteerAngle;
-
-#endif
       }
 
       osg::Vec3 steering = limit(desired - velocity, maxForce);
@@ -212,39 +202,21 @@ namespace Soleil {
     }
 
     if (velocity.length2() > 0.0f) {
-// TODO: Orient the craft event if velocity == 0
+      // TODO: Orient the craft event if velocity == 0
+      osg::Vec3 new_forward = normalize(velocity);
 #if 0
-      osg::Quat q;
-      q.makeRotate(osg::Vec3(0, 1, 0), velocity);
-#else
-      osg::Vec3     new_forward    = normalize(velocity);
-      osg::Vec3     approximate_up(0, 0, 1);
-      osg::Vec3     new_side = new_forward ^ approximate_up; // cross product
-      osg::Vec3     new_up   = new_forward ^ new_side;       // cross product
-      // osg::Quat q(0.0f, new_forward);
-      // q.makeRotate(0.0f, new_forward);
-      // osg::Quat q = quatLookAt(new_forward);  // good
-      // osg::Quat result = quatLookAt(new_forward); // good
-      // osg::Quat q =
-      //   osg::Quat(std::acos(osg::Vec3(new_forward.x(), new_forward.y(), 0.0f)
-      //   *
-      //                       VectorFront()),
-      //             VectorUp()) *
-      //   osg::Quat(
-      //     std::acos(osg::Vec3(0.0f, 0.0f, new_forward.z()) * VectorUp()),
-      //     VectorRight());
-      const osg::Quat q = quatLookAt(new_forward, VectorUp());
-// const osg::Quat q = quatLookAt(new_forward, normalize(new_up));
-
+      // TODO: For the roll operation if needed
+      osg::Vec3 approximate_up(0, 0, 1);
+      osg::Vec3 new_side = new_forward ^ approximate_up; // cross product
+      osg::Vec3 new_up   = new_forward ^ new_side;       // cross product
 #endif
-      osg::Matrix m = node->getMatrix();
+      const osg::Quat q = quatLookAt(new_forward, VectorUp());
+      osg::Matrix     m = node->getMatrix();
       m.setRotate(q); //   * deltaTime
       m *= osg::Matrix::translate(velocity * deltaTime);
 
-      // TODO: Restore collistion
       const osg::Vec3 nextPosition = m.getTrans();
       osg::Vec3       collisionNormal;
-
       if (Soleil::SceneManager::SegmentCollision(node->getMatrix().getTrans(),
                                                  nextPosition, node,
                                                  &collisionNormal)) {
