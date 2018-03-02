@@ -113,7 +113,11 @@ namespace Soleil {
       case AlienCraftChasePlayer:
         desired = chasePlayer(targetToCraft, current, deltaTime, node);
         break;
-      case AlienCraftFlee: desired = flee(playerDirection); break;
+      // case AlienCraftFlee: desired = flee(playerDirection); break;
+      case AlienCraftFlee:
+        desired = normalize(current - target) * maxSpeed;
+        break;
+
       case AlienCraftGoto: desired = goTo(targetToCraft); break;
     };
     remainingActionTime -= deltaTime;
@@ -213,10 +217,10 @@ namespace Soleil {
       osg::Quat q;
       q.makeRotate(osg::Vec3(0, 1, 0), velocity);
 #else
-      osg::Vec3 new_forward = normalize(velocity);
-      osg::Vec3 approximate_up(0, 0, 1);
-      osg::Vec3 new_side = new_forward ^ approximate_up; // cross product
-      osg::Vec3 new_up   = new_forward ^ new_side;       // cross product
+      osg::Vec3     new_forward    = normalize(velocity);
+      osg::Vec3     approximate_up(0, 0, 1);
+      osg::Vec3     new_side = new_forward ^ approximate_up; // cross product
+      osg::Vec3     new_up   = new_forward ^ new_side;       // cross product
       // osg::Quat q(0.0f, new_forward);
       // q.makeRotate(0.0f, new_forward);
       // osg::Quat q = quatLookAt(new_forward);  // good

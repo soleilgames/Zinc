@@ -158,7 +158,7 @@ public:
 PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
   osg::MatrixTransform* target)
   : target_(target)
-  , offset(0, -10, 0)
+  , offset(0, -20, 0)
   , planeAttitude()
   , planePitch(0.0f)
   , previousTime(-1.0)
@@ -317,7 +317,7 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
                         // bone or a node
 
       const osg::Vec3 maxRange =
-        targetPosition + qResult * osg::Vec3(0, 100, 0);
+        targetPosition + qResult * osg::Vec3(0, 200, 0);
 
       osg::NodePath path;
       if (Soleil::SceneManager::SegmentCollision(
