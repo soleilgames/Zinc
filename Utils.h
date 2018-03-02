@@ -226,9 +226,9 @@ quatLookAt(const osg::Vec3& dir, const osg::Vec3& up)
   if (up != dir) {
     const osg::Vec3 v = dir + up * -(up * dir);
     osg::Quat       q;
-    q.makeRotate_original(VectorFront(), v);
+    q.makeRotate(VectorFront(), v);
     osg::Quat r;
-    r.makeRotate_original(v, dir);
+    r.makeRotate(v, dir);
     return q * r; // * q;
   }
 
