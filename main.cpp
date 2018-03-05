@@ -503,6 +503,7 @@ createExplosionQuad()
   quad->setNodeMask(quad->getNodeMask() &
                     (~Soleil::SceneManager::Mask::Shootable |
                      ~Soleil::SceneManager::Mask::Collision));
+  quad->setName("Explosion");
   return quad;
 }
 
@@ -708,6 +709,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   auto                              plane             = createPlayerGraph();
   osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup = new Soleil::EntityGroup;
   playerEntityGroup->addChild(plane);
+  playerEntityGroup->setName("PlayerEntityGroup");
   root->addChild(playerEntityGroup);
 
   ///////////////////////
@@ -827,8 +829,15 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
       Soleil::EntityGroup* group =
         dynamic_cast<Soleil::EntityGroup*>(event->object[1]);
+      osg::Node* node = event->object[2];
       assert(group && "Cannot remove from other than EntityGroup");
-      group->removeChild(event->object[2]);
+      Soleil::EventManager::Delay(0.0f, [group, node](Soleil::Event& /*e*/) {
+        // Delay the removal of the node
+        // TODO: Base class each actor with an Actor class (that extends
+        // MatrixTransform or PositionAttitudeTransform) and add a flag
+        // `inRemoveQueue` to avoid removing twice a node
+        group->removeChild(node);
+      });
       if (event->object[2]->getName() == "Player") {
         Soleil::EventManager::Emit(
           std::make_shared<Soleil::EventPlayerDestroyed>());
@@ -889,7 +898,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   // Ennemy section:
   osg::ref_ptr<Soleil::EntityGroup> ennemies = new Soleil::EntityGroup;
-  osg::ref_ptr<osg::Node>           templateEnnemy =
+  ennemies->setName("EnemiesEntityGroup");
+  osg::ref_ptr<osg::Node> templateEnnemy =
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
@@ -943,7 +953,8 @@ main(int // argc
        [])
 {
   osg::ref_ptr<osg::Group> root = new osg::Group();
-  osgViewer::Viewer        viewer;
+  root->setName("ROOT");
+  osgViewer::Viewer viewer;
 
   SystemEventManager.enroll(
     Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
