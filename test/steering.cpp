@@ -172,8 +172,8 @@ main(int // argc
   }
 #else
   CreateAlienCraft(osg::Vec3(30, 0, 0));
-  // CreateAlienCraft(osg::Vec3(30, 2, 0));
-  // CreateAlienCraft(osg::Vec3(30, -2, 0));
+  CreateAlienCraft(osg::Vec3(30, 2, 0));
+  CreateAlienCraft(osg::Vec3(30, -2, 0));
   CreateAlienCraft(osg::Vec3(34, 0, 0));
 #endif
 

@@ -65,6 +65,8 @@ namespace Soleil {
     osg::Vec3 flee(const osg::Vec3& playerDirection);
     osg::Vec3 goTo(const osg::Vec3& targetToCraft);
     void applyForceSeparate(const osg::Vec3& currentPosition);
+    void applyForceAlignment(const osg::Vec3& currentPosition);
+    void applyForceCohesion(const osg::Vec3& currentPosition);
 
   public: // TODO: Only one Callback for all boids
     struct Boid
@@ -79,7 +81,7 @@ namespace Soleil {
     static constexpr float ChaseRange      = 200.0f * 200.0f;
     static constexpr float FireRange       = 50.0f * 50.0f;
     static constexpr float Avoidance       = 20.0f * 20.0f;
-    static constexpr float SeparationRange = 1.5f;
+    static constexpr float SeparationRange = 10.5f;
     static constexpr float Facing          = 0.98f;
   };
 

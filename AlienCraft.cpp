@@ -141,6 +141,10 @@ namespace Soleil {
     remainingActionTime -= deltaTime;
     if (remainingActionTime <= 0.0f) behavior = AlienCraftNoBehavior;
 
+    // this->applyForceSeparate(current);
+    // this->applyForceAlignment(current);
+    // this->applyForceCohesion(current);
+
     if (desired.length2() > 0.0f) {
       // If the vehicle has no velocity, allows an abrupt turn
       if (velocity.length2() > 0.0f) {
@@ -163,6 +167,8 @@ namespace Soleil {
     }
 
     this->applyForceSeparate(current);
+    this->applyForceAlignment(current);
+    this->applyForceCohesion(current);
 
 // TODO: remove test:
 #ifdef SOLEIL__DEBUG_STEERING
@@ -328,7 +334,73 @@ namespace Soleil {
       osg::Vec3 steer = sum - velocity;
       steer           = limit(steer, maxForce);
 
-      steer *= 1.5f; // // TODO:
+      steer *= 1.5f; // // TODO: configurable
+
+      force += steer;
+    }
+  }
+
+  void AlienCraft::applyForceAlignment(const osg::Vec3& currentPosition)
+  {
+    int       count = 0;
+    osg::Vec3 sum;
+
+    for (auto it = boids.begin(); it != boids.end(); ++it) {
+      if (it->id == myBoidId) continue;
+
+      const osg::Vec3 diff     = currentPosition - it->position;
+      const float     distance = diff.length();
+      if (distance > SeparationRange) {
+        continue;
+      }
+
+      sum += it->velocity;
+      // SOLEIL__LOGGER_DEBUG((diff / distance * distance),
+      //                      "==", normalize(diff) / distance);
+
+      count++;
+    }
+
+    if (count > 0) {
+      sum /= count;
+      sum.normalize();
+      sum *= maxSpeed;
+      osg::Vec3 steer = sum - velocity;
+      steer           = limit(steer, maxForce);
+
+      steer *= .40f; // // TODO: configurable
+
+      force += steer;
+    }
+  }
+
+  void AlienCraft::applyForceCohesion(const osg::Vec3& currentPosition)
+  {
+    int       count = 0;
+    osg::Vec3 sum;
+
+    for (auto it = boids.begin(); it != boids.end(); ++it) {
+      if (it->id == myBoidId) continue;
+
+      const osg::Vec3 diff     = currentPosition - it->position;
+      const float     distance = diff.length();
+      if (distance > SeparationRange) {
+        continue;
+      }
+
+      sum += it->position;
+      // SOLEIL__LOGGER_DEBUG((diff / distance * distance),
+      //                      "==", normalize(diff) / distance);
+
+      count++;
+    }
+
+    if (count > 0) {
+      sum /= count;
+
+      const osg::Vec3 desired = normalize(sum - currentPosition) * maxSpeed;
+      const osg::Vec3 steer =
+        (desired - velocity) * .010f; // // TODO: configurable
 
       force += steer;
     }

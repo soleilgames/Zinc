@@ -230,11 +230,11 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   osg::Matrix planeOrientation;
   float       planeRoll = 0.0f;
   planeRoll =
-    RollSpeed * atan2(Sign(x) * ExponentialEaseIn(osg::absolute(x)),
+    RollSpeed * atan2(Sign(x) * QuadraticEaseIn(osg::absolute(x)),
                       (osg::absolute(y) > Min) ? osg::absolute(y) : Min);
 
   planePitch += (osg::absolute(y) > Min)
-                  ? PitchSpeed * Sign(y) * ExponentialEaseIn(osg::absolute(y))
+                  ? PitchSpeed * Sign(y) * QuadraticEaseIn(osg::absolute(y))
                   : 0.0f;
   planePitch = osg::clampBetween(planePitch, -MaxPitch, MaxPitch);
 
@@ -731,12 +731,12 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   // root->addChild(createAxisPath(10));
 
-  root->addChild(osgDB::readNodeFile("../media/ZincIslands.obj"));
   osg::ref_ptr<osg::Group> model =
     osgDB::readNodeFile("../media/islands.3ds.osgt")->asGroup();
   assert(model);
   model->setNodeMask(model->getNodeMask() &
                      ~Soleil::SceneManager::Mask::Shootable);
+  model->setName("Level");
   root->addChild(model);
   // Soleil::SceneManager::Init(model);
   Soleil::SceneManager::Init(root);
@@ -749,6 +749,9 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   explosion     = new osg::Billboard;
   tracerUpdater = new Soleil::ShootTracerCallback;
 
+  shootTracers->setName("ShootTracers");
+  shootTracers->setNodeMask(shootTracers->getNodeMask() &
+                            ~Soleil::SceneManager::Mask::Shootable);
   // osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
   explosion->setNodeMask(explosion->getNodeMask() &
                          ~Soleil::SceneManager::Mask::Shootable);
@@ -903,10 +906,10 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < 5; ++i) {
     osg::ref_ptr<osg::MatrixTransform> first    = new osg::MatrixTransform;
-    constexpr float                    MinRange = 50;
-    constexpr float                    MaxRange = 175;
+    constexpr float                    MinRange = 150;
+    constexpr float                    MaxRange = 275;
     first->setMatrix(osg::Matrix::translate(
       Random(MinRange, MaxRange), Random(MinRange, MaxRange), Random(-10, 10)));
     // first->setMatrix(osg::Matrix::translate(0, 150, 0));
