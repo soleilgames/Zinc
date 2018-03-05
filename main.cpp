@@ -149,6 +149,7 @@ private:
 
 private:
   osg::Quat   cameraAttitude; /// Used to slerp the rotation to the target
+  osg::Quat   cameraCenter;   /// Used to slerp the rotation to the center
   osg::Matrix viewMatrix;
 
 public:
@@ -158,7 +159,7 @@ public:
 PlayerFlightCameraManipulator::PlayerFlightCameraManipulator(
   osg::MatrixTransform* target)
   : target_(target)
-  , offset(0, -20, 0)
+  , offset(0, -10, 1)
   , planeAttitude()
   , planePitch(0.0f)
   , previousTime(-1.0)
@@ -293,14 +294,17 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   constexpr float SlerpSpeed = 3.0f;
 
   const osg::Vec3 targetPosition = translate;
-  const osg::Vec3 center         = targetPosition;
-  const osg::Vec3 up             = osg::Vec3(0, 0, 1);
-  osg::Quat       toRotation;
-  // toRotation.set(PlaneNode->getMatrix());
-  toRotation = qResult;
+  // const osg::Vec3 center         = targetPosition;
+  const osg::Vec3 up         = osg::Vec3(0, 0, 1);
+  const osg::Quat toRotation = qResult;
   cameraAttitude.slerp(SlerpSpeed * delta, cameraAttitude, toRotation);
-  const osg::Vec3 eye = targetPosition + (cameraAttitude * offset);
-  viewMatrix          = osg::Matrix::lookAt(eye, center, up);
+
+  const osg::Quat toCenter = (qPitch * planeAttitude);
+  cameraCenter.slerp(SlerpSpeed * delta, cameraCenter, toCenter);
+
+  const osg::Vec3 eye    = targetPosition + (cameraAttitude * offset);
+  const osg::Vec3 center = eye + cameraCenter * osg::Vec3(0, 1, 0);
+  viewMatrix             = osg::Matrix::lookAt(eye, center, up);
 
   /////////////////////
   // Test click-fire //
@@ -881,10 +885,12 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  for (int i = 0; i < 3; ++i) {
-    osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
-    first->setMatrix(osg::Matrix::translate(Random(50, 250), Random(50, 250),
-                                            Random(50, 250)));
+  for (int i = 0; i < 10; ++i) {
+    osg::ref_ptr<osg::MatrixTransform> first    = new osg::MatrixTransform;
+    constexpr float                    MinRange = 50;
+    constexpr float                    MaxRange = 175;
+    first->setMatrix(osg::Matrix::translate(
+      Random(MinRange, MaxRange), Random(MinRange, MaxRange), Random(-10, 10)));
     // first->setMatrix(osg::Matrix::translate(0, 150, 0));
     first->addChild(templateEnnemy);
 

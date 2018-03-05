@@ -150,20 +150,32 @@ main(int // argc
   osg::ref_ptr<osg::Node>           templateEnnemy =
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
-  // First:
-  for (int i = 0; i < 10; ++i) {
+  auto CreateAlienCraft =
+    [&ennemies, &templateEnnemy, num = 0 ](const osg::Vec3& position)
+  {
     osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
-    constexpr float                    Range = 50;
-    first->setMatrix(osg::Matrix::translate(
-      Random(-Range, Range), Random(-Range, Range), Random(-Range, Range)));
+    first->setMatrix(osg::Matrix::translate(position));
     // first->setMatrix(osg::Matrix::translate(30, 00, -30));
     first->addChild(templateEnnemy);
 
     osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
     first->addUpdateCallback(ac);
-    first->setName(Soleil::toString("FirstEnnemy_N", i));
+    first->setName(Soleil::toString("FirstEnnemy_N", num));
     ennemies->addChild(first);
+  };
+// First:
+#if 0
+  for (int i = 0; i < 10; ++i) {
+    constexpr float Range = 50;
+    CreateAlienCraft(osg::Vec3(Random(-Range, Range), Random(-Range, Range),
+                               Random(-Range, Range)));
   }
+#else
+  CreateAlienCraft(osg::Vec3(30, 0, 0));
+  // CreateAlienCraft(osg::Vec3(30, 2, 0));
+  // CreateAlienCraft(osg::Vec3(30, -2, 0));
+  CreateAlienCraft(osg::Vec3(34, 0, 0));
+#endif
 
   root->addChild(ennemies);
 

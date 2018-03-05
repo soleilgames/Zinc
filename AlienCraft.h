@@ -31,6 +31,7 @@ namespace Soleil {
   {
   public:
     AlienCraft();
+    virtual ~AlienCraft();
     bool run(osg::Object* object, osg::Object* data);
 
   public:
@@ -63,14 +64,23 @@ namespace Soleil {
                           osg::Node* node);
     osg::Vec3 flee(const osg::Vec3& playerDirection);
     osg::Vec3 goTo(const osg::Vec3& targetToCraft);
+    void applyForceSeparate(const osg::Vec3& currentPosition);
+
+  public: // TODO: Only one Callback for all boids
+    struct Boid
+    {
+      std::size_t id;
+      osg::Vec3   velocity;
+      osg::Vec3   position;
+    };
+    std::size_t myBoidId;
 
   public:
-    static constexpr float ChaseRange =
-      200.0f * 200.0f; // (we are using lenght2)
-    static constexpr float FireRange = 50.0f * 50.0f;
-    static constexpr float Avoidance =
-      20.0f * 20.0f; // TODO: Use Avoidance behavior
-    static constexpr float Facing = 0.98f;
+    static constexpr float ChaseRange      = 200.0f * 200.0f;
+    static constexpr float FireRange       = 50.0f * 50.0f;
+    static constexpr float Avoidance       = 20.0f * 20.0f;
+    static constexpr float SeparationRange = 1.5f;
+    static constexpr float Facing          = 0.98f;
   };
 
 } // Soleil

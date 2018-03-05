@@ -37,7 +37,11 @@
 
 namespace Soleil {
 
+  // TODO: Remove debug:
   static osg::ref_ptr<osg::Node> taxis;
+
+  static std::size_t                   currenId = 0;
+  static std::vector<AlienCraft::Boid> boids;
 
   AlienCraft::AlienCraft()
     : velocity(0.0f, 0.0f, 0.0f)
@@ -55,6 +59,20 @@ namespace Soleil {
   {
     if (!taxis) {
       taxis = osgDB::readNodeFile("../media/taxis.osgt");
+    }
+
+    myBoidId = currenId++;
+    boids.push_back({myBoidId, osg::Vec3(), osg::Vec3()});
+  }
+
+  AlienCraft::~AlienCraft()
+  {
+    // Remove ourself from the boids list
+    for (auto it = boids.begin(); it != boids.end(); ++it) {
+      if (it->id == myBoidId) {
+        boids.erase(it);
+        return;
+      }
     }
   }
 
@@ -144,6 +162,8 @@ namespace Soleil {
       force              = steering;
     }
 
+    this->applyForceSeparate(current);
+
 // TODO: remove test:
 #ifdef SOLEIL__DEBUG_STEERING
     {
@@ -229,6 +249,19 @@ namespace Soleil {
       }
     }
 
+    // Update velocity for other boids: -------------------
+    Boid* me = nullptr;
+    for (auto it = boids.begin(); it != boids.end(); ++it) {
+      if (it->id == myBoidId) {
+        me = it.base();
+        break;
+      }
+    }
+    assert(me != nullptr && "Boid not found in list");
+    me->velocity = velocity;
+    me->position = current;
+    // TODO: Use my own map or one callback for every boids
+
     previousTime = visitor->getFrameStamp()->getSimulationTime();
     return traverse(object, data);
   }
@@ -265,6 +298,40 @@ namespace Soleil {
   osg::Vec3 AlienCraft::goTo(const osg::Vec3& targetToCraft)
   {
     return normalize(targetToCraft) * maxSpeed;
+  }
+
+  void AlienCraft::applyForceSeparate(const osg::Vec3& currentPosition)
+  {
+    int       count = 0;
+    osg::Vec3 sum;
+
+    for (auto it = boids.begin(); it != boids.end(); ++it) {
+      if (it->id == myBoidId) continue;
+
+      const osg::Vec3 diff     = currentPosition - it->position;
+      const float     distance = diff.length();
+      if (distance > SeparationRange) {
+        continue;
+      }
+
+      sum += (diff / distance * distance); // weight by distance
+      // SOLEIL__LOGGER_DEBUG((diff / distance * distance),
+      //                      "==", normalize(diff) / distance);
+
+      count++;
+    }
+
+    if (count > 0) {
+      sum /= count;
+      sum.normalize();
+      sum *= maxSpeed;
+      osg::Vec3 steer = sum - velocity;
+      steer           = limit(steer, maxForce);
+
+      steer *= 1.5f; // // TODO:
+
+      force += steer;
+    }
   }
 
 } // Soleil
