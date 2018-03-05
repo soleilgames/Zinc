@@ -309,45 +309,53 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   /////////////////////
   // Test click-fire //
   /////////////////////
-  switch (event.getEventType()) {
-    case osgGA::GUIEventAdapter::EventType::PUSH: {
+  // SOLEIL__LOGGER_DEBUG("MOUSE MASK", event.getButtonMask());
+  //   SOLEIL__LOGGER_DEBUG("MOUSE ", event.getButton());
+  // switch (event.getEventType()) {
+  // case osgGA::GUIEventAdapter::EventType::PUSH: {
+  if (event.getButtonMask() &
+      osgGA::GUIEventAdapter::MouseButtonMask::LEFT_MOUSE_BUTTON) {
+    const osg::Vec3 tracerStartPoint =
+      targetPosition +
+      qResult * osg::Vec3(0, 5.0f,
+                          0); // TODO: Workaround to avoid starting point to be
+                              // at the tail, next attach the start point to a
+                              // bone or a node
 
-      const osg::Vec3 tracerStartPoint =
-        targetPosition +
-        qResult *
-          osg::Vec3(0, 5.0f,
-                    0); // TODO: Workaround to avoid starting point to be
-                        // at the tail, next attach the start point to a
-                        // bone or a node
+    const osg::Vec3 maxRange = targetPosition + qResult * osg::Vec3(0, 200, 0);
 
-      const osg::Vec3 maxRange =
-        targetPosition + qResult * osg::Vec3(0, 200, 0);
+    osg::NodePath path;
+    if (Soleil::SceneManager::SegmentCollision(
+          tracerStartPoint, maxRange, PlayerNode, nullptr, nullptr,
+          Soleil::SceneManager::Mask::Shootable, &path)) {
+      Soleil::EventManager::Emit(
+        std::make_shared<Soleil::EventDestructObject>(path));
+    }
 
-      osg::NodePath path;
-      if (Soleil::SceneManager::SegmentCollision(
-            tracerStartPoint, maxRange, PlayerNode, nullptr, nullptr,
-            Soleil::SceneManager::Mask::Shootable, &path)) {
-        Soleil::EventManager::Emit(
-          std::make_shared<Soleil::EventDestructObject>(path));
-      }
+    // TODO: Every x frames
+    static int      exp          = 0;
+    static float    lastFireTime = 0.0f;
+    constexpr float FireRate     = 1.0f / 10.0f;
 
-      // TODO: Every x frames
-      static int exp = 0;
+    lastFireTime += delta;
+    if (lastFireTime >= FireRate) {
+      lastFireTime = 0.0f;
 
       const unsigned int id = exp % NumOfExplosions;
       explosion->setPosition(id, maxRange);
       explosionImpostor[id]->time = 0.0f;
       explosion->computeBound();
-      explosion->dirtyBound();
+      explosion->dirtyBound(); // Make sure to reset the Billboard bounds
 
       assert(shootTracers->getNumDrawables() >= id);
 
       tracerUpdater->tracers[id]->updateHead(tracerStartPoint,
                                              qResult * osg::Vec3f(0, 1, 0));
       ++exp;
-
-    } break;
+    }
   }
+  //   } break;
+  // }
 
   return true;
 }
