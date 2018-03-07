@@ -77,12 +77,13 @@
 
 // USE_GRAPHICSWINDOW()
 
-osg::Vec3                                    worldPosition;
-osg::ref_ptr<osg::MatrixTransform>           GroupPtr;
 osg::ref_ptr<osg::PositionAttitudeTransform> PlayerNode;
-osg::ref_ptr<osg::MatrixTransform>           PlaneNode;
-osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
 Soleil::EventManager                         SystemEventManager;
+
+// osg::Vec3                                    worldPosition;
+// osg::ref_ptr<osg::MatrixTransform>           PlaneNode;
+// osg::ref_ptr<osg::MatrixTransform>           GroupPtr;
+// osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
 
 // TODO: Not here:
 
@@ -332,7 +333,6 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
         std::make_shared<Soleil::EventDestructObject>(path));
     }
 
-    // TODO: Every x frames
     static int      exp          = 0;
     static float    lastFireTime = 0.0f;
     constexpr float FireRate     = 1.0f / 10.0f;
@@ -518,23 +518,8 @@ createPlayerGraph()
   // osgDB::readNodeFile("../media/Player.osgt");
   osg::ref_ptr<osg::Node> cessna =
     osgDB::readNodeFile("../media/ZincAF100.osgt");
-  osg::ref_ptr<osg::Node> axes = osgDB::readNodeFile("../media/axes.osgt");
   assert(cessna.get() != nullptr && "Root is null");
   group->addChild(cessna);
-  // group->addChild(axes);
-
-  // TODO: FIXME the osgexport do not export camera node as a node alone
-  // osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
-  //   Soleil::GetNodeByName(*cessna, "Camera"));
-  // assert(camNode); // TODO: Better error system
-
-  // CameraBase = new osg::PositionAttitudeTransform;
-  // osg::ref_ptr<osg::MatrixTransform> newCamNode = new osg::MatrixTransform;
-  // newCamNode->setMatrix(camNode->getMatrix());
-  // newCamNode->setName("NewCamera");
-  // // group->addChild(newCamNode);
-  // CameraBase->addChild(newCamNode);
-  // group->addChild(CameraBase);
 
   group->setName("Player");
   return group;
@@ -663,8 +648,7 @@ CreateAlienShootPS(osg::Group& parent)
 
   ps->setDefaultAttributes("../media/textures/alienshoot.png", false, false);
 
-  float radius  = 0.4f * scale;
-  float density = 1.2f; // 1.0kg/m^3
+  float radius = 0.4f * scale;
 
   auto& defaultParticleTemplate = ps->getDefaultParticleTemplate();
   defaultParticleTemplate.setLifeTime(1.0);
@@ -676,8 +660,6 @@ CreateAlienShootPS(osg::Group& parent)
   // defaultParticleTemplate.setMass(density * radius * radius * radius *
   // osg::PI *
   //                                 4.0f / 3.0f);
-
-  // TODO: Try         _program = new osgParticle::FluidProgram;
 
   osg::ref_ptr<osgParticle::ModularProgram> program =
     new osgParticle::ModularProgram;
@@ -695,8 +677,6 @@ CreateAlienShootPS(osg::Group& parent)
     new osgParticle::ParticleSystemUpdater;
   updater->addParticleSystem(ps);
   parent.addChild(updater);
-
-  // MeshSetLineMode(geometry);
 
   return ps;
 }
@@ -755,7 +735,6 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   shootTracers->setName("ShootTracers");
   shootTracers->setNodeMask(shootTracers->getNodeMask() &
                             ~Soleil::SceneManager::Mask::Shootable);
-  // osg::ref_ptr<osg::Billboard> explosion = new osg::Billboard;
   explosion->setNodeMask(explosion->getNodeMask() &
                          ~Soleil::SceneManager::Mask::Shootable);
   explosion->setNodeMask(explosion->getNodeMask() &
@@ -816,11 +795,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   Soleil::EventManager::Enroll(
     Soleil::EventDestructObject::Type(), [root](Soleil::Event& e) {
-      // Soleil::EventDestructObject* event =
-      // static_cast<Soleil::EventDestructObject*>(&e);
       Soleil::EventDestructObject* event =
-        dynamic_cast<Soleil::EventDestructObject*>(&e);
-      assert(event);
+        static_cast<Soleil::EventDestructObject*>(&e);
 
       std::stringstream s;
       for (const auto v : event->object) {
@@ -864,27 +840,17 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   ///////////////////////////////////////////
   // Setting the player camera manipulator //
   ///////////////////////////////////////////
-  PlayerNode                                 = plane;
+  PlayerNode = plane;
+#if 0 // Add axis
   osg::ref_ptr<osg::MatrixTransform> centerg = new osg::MatrixTransform;
-  // centerg->addChild(osgDB::readNodeFile("../media/axes.osgt"));
+  centerg->addChild(osgDB::readNodeFile("../media/axes.osgt"));
   centerg->setMatrix(
     osg::Matrix::translate(PlayerNode->computeBound().center()));
   PlayerNode->addChild(centerg);
-
-#if 0
-  PlaneNode = dynamic_cast<osg::MatrixTransform*>(
-    Soleil::GetNodeByName(*plane.get(), "PlaneRC1"));
-  assert(PlaneNode);
 #endif
-  // osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
-  //   Soleil::GetNodeByName(*plane.get(), "NewCamera"));
-  // assert(camNode); // TODO: Better error system
 
-  // osg::ref_ptr<PlayerFlightCameraManipulator> playerManipulator =
-  //   new PlayerFlightCameraManipulator(camNode);
   osg::ref_ptr<PlayerFlightCameraManipulator> playerManipulator =
     new PlayerFlightCameraManipulator(nullptr);
-  // viewer.setCameraManipulator(playerManipulator);
   osg::ref_ptr<osgGA::KeySwitchMatrixManipulator> ks =
     new osgGA::KeySwitchMatrixManipulator;
   ks->addMatrixManipulator(osgGA::GUIEventAdapter::KeySymbol::KEY_F11, "Flight",
@@ -966,14 +932,15 @@ main(int // argc
   root->setName("ROOT");
   osgViewer::Viewer viewer;
 
-  SystemEventManager.enroll(
-    Soleil::EventLoadLevel::Type(), [root, &viewer](Soleil::Event& e) {
-      Soleil::EventLoadLevel* event = static_cast<Soleil::EventLoadLevel*>(&e);
+  SystemEventManager.enroll(Soleil::EventLoadLevel::Type(),
+                            [root, &viewer](Soleil::Event& /*e*/) {
+                              // Soleil::EventLoadLevel* event =
+                              // static_cast<Soleil::EventLoadLevel*>(&e);
 
-      SOLEIL__LOGGER_DEBUG("Need to load a new level");
-      root->removeChildren(0, root->getNumChildren());
-      FirstLevelSetup(root, viewer);
-    });
+                              SOLEIL__LOGGER_DEBUG("Need to load a new level");
+                              root->removeChildren(0, root->getNumChildren());
+                              FirstLevelSetup(root, viewer);
+                            });
 
   FirstLevelSetup(root, viewer);
 
@@ -986,7 +953,6 @@ main(int // argc
 
   Soleil::EventManager::Emit(std::make_shared<Soleil::EventLoadLevel>("first"));
 
-  // return viewer.run();
   double previousTime = viewer.getFrameStamp()->getSimulationTime();
   while (!viewer.done()) {
     viewer.frame();
