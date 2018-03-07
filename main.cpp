@@ -514,24 +514,27 @@ createPlayerGraph()
 {
   osg::ref_ptr<osg::PositionAttitudeTransform> group =
     new osg::PositionAttitudeTransform;
-  osg::ref_ptr<osg::Node> cessna = osgDB::readNodeFile("../media/Player.osgt");
-  osg::ref_ptr<osg::Node> axes   = osgDB::readNodeFile("../media/axes.osgt");
+  // osg::ref_ptr<osg::Node> cessna =
+  // osgDB::readNodeFile("../media/Player.osgt");
+  osg::ref_ptr<osg::Node> cessna =
+    osgDB::readNodeFile("../media/ZincAF100.osgt");
+  osg::ref_ptr<osg::Node> axes = osgDB::readNodeFile("../media/axes.osgt");
   assert(cessna.get() != nullptr && "Root is null");
   group->addChild(cessna);
   // group->addChild(axes);
 
   // TODO: FIXME the osgexport do not export camera node as a node alone
-  osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
-    Soleil::GetNodeByName(*cessna, "Camera"));
-  assert(camNode); // TODO: Better error system
+  // osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
+  //   Soleil::GetNodeByName(*cessna, "Camera"));
+  // assert(camNode); // TODO: Better error system
 
-  CameraBase = new osg::PositionAttitudeTransform;
-  osg::ref_ptr<osg::MatrixTransform> newCamNode = new osg::MatrixTransform;
-  newCamNode->setMatrix(camNode->getMatrix());
-  newCamNode->setName("NewCamera");
-  // group->addChild(newCamNode);
-  CameraBase->addChild(newCamNode);
-  group->addChild(CameraBase);
+  // CameraBase = new osg::PositionAttitudeTransform;
+  // osg::ref_ptr<osg::MatrixTransform> newCamNode = new osg::MatrixTransform;
+  // newCamNode->setMatrix(camNode->getMatrix());
+  // newCamNode->setName("NewCamera");
+  // // group->addChild(newCamNode);
+  // CameraBase->addChild(newCamNode);
+  // group->addChild(CameraBase);
 
   group->setName("Player");
   return group;
@@ -868,15 +871,19 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osg::Matrix::translate(PlayerNode->computeBound().center()));
   PlayerNode->addChild(centerg);
 
+#if 0
   PlaneNode = dynamic_cast<osg::MatrixTransform*>(
-    Soleil::GetNodeByName(*plane.get(), "Plane"));
+    Soleil::GetNodeByName(*plane.get(), "PlaneRC1"));
   assert(PlaneNode);
-  osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
-    Soleil::GetNodeByName(*plane.get(), "NewCamera"));
-  assert(camNode); // TODO: Better error system
+#endif
+  // osg::MatrixTransform* camNode = dynamic_cast<osg::MatrixTransform*>(
+  //   Soleil::GetNodeByName(*plane.get(), "NewCamera"));
+  // assert(camNode); // TODO: Better error system
 
+  // osg::ref_ptr<PlayerFlightCameraManipulator> playerManipulator =
+  //   new PlayerFlightCameraManipulator(camNode);
   osg::ref_ptr<PlayerFlightCameraManipulator> playerManipulator =
-    new PlayerFlightCameraManipulator(camNode);
+    new PlayerFlightCameraManipulator(nullptr);
   // viewer.setCameraManipulator(playerManipulator);
   osg::ref_ptr<osgGA::KeySwitchMatrixManipulator> ks =
     new osgGA::KeySwitchMatrixManipulator;
