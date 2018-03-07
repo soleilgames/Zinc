@@ -19,6 +19,7 @@
  * THE SOFTWARE.
  */
 
+#include "Actor.h"
 #include "AlienCraft.h"
 #include "EntityGroup.h"
 #include "EventManager.h"
@@ -153,8 +154,8 @@ main(int // argc
   auto CreateAlienCraft =
     [&ennemies, &templateEnnemy, num = 0 ](const osg::Vec3& position)
   {
-    osg::ref_ptr<osg::MatrixTransform> first = new osg::MatrixTransform;
-    first->setMatrix(osg::Matrix::translate(position));
+    osg::ref_ptr<Soleil::Actor> first = new Soleil::Actor(1);
+    first->setPosition(position);
     // first->setMatrix(osg::Matrix::translate(30, 00, -30));
     first->addChild(templateEnnemy);
 

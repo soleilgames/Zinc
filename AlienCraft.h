@@ -23,7 +23,7 @@
 #define SOLEIL__ALIENCRAFT_H_
 
 #include <osg/Callback>
-#include <osg/MatrixTransform>
+#include <osg/Vec3>
 
 namespace Soleil {
 

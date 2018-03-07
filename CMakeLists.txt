@@ -63,6 +63,7 @@ SET(ZINC_ENGINE_SRC
   EventManager.cpp
   Time.cpp
   EntityGroup.cpp
+  Actor.cpp
   AlienCraft.cpp
   ParticleObjects.cpp
   )

@@ -49,6 +49,7 @@
 
 #include <osg/Timer>
 
+#include "Actor.h"
 #include "AlienCraft.h"
 #include "EntityGroup.h"
 #include "EventManager.h"
@@ -512,8 +513,9 @@ createExplosionQuad()
 static osg::ref_ptr<osg::PositionAttitudeTransform>
 createPlayerGraph()
 {
-  osg::ref_ptr<osg::PositionAttitudeTransform> group =
-    new osg::PositionAttitudeTransform;
+  // osg::ref_ptr<osg::PositionAttitudeTransform> group =
+  //   new osg::PositionAttitudeTransform;
+  osg::ref_ptr<Soleil::Actor> group = new Soleil::Actor(3);
   // osg::ref_ptr<osg::Node> cessna =
   // osgDB::readNodeFile("../media/Player.osgt");
   osg::ref_ptr<osg::Node> cessna =
@@ -689,7 +691,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   SOLEIL__LOGGER_DEBUG("Loading new level...");
   Soleil::EventManager::Init();
 
-  auto                              plane             = createPlayerGraph();
+  osg::ref_ptr<osg::PositionAttitudeTransform> plane  = createPlayerGraph();
   osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup = new Soleil::EntityGroup;
   playerEntityGroup->addChild(plane);
   playerEntityGroup->setName("PlayerEntityGroup");
@@ -811,18 +813,27 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
       Soleil::EntityGroup* group =
         dynamic_cast<Soleil::EntityGroup*>(event->object[1]);
-      osg::Node* node = event->object[2];
       assert(group && "Cannot remove from other than EntityGroup");
-      Soleil::EventManager::Delay(0.0f, [group, node](Soleil::Event& /*e*/) {
-        // Delay the removal of the node
-        // TODO: Base class each actor with an Actor class (that extends
-        // MatrixTransform or PositionAttitudeTransform) and add a flag
-        // `inRemoveQueue` to avoid removing twice a node
-        group->removeChild(node);
-      });
-      if (event->object[2]->getName() == "Player") {
-        Soleil::EventManager::Emit(
-          std::make_shared<Soleil::EventPlayerDestroyed>());
+      // osg::Node* node = event->object[2];
+      Soleil::Actor* actor = dynamic_cast<Soleil::Actor*>(event->object[2]);
+      assert(actor && "Entity group shall accept only actors");
+
+      if (actor->inRemoveQueue == false) {
+        actor->lifePoints--;
+        if (actor->lifePoints > 0) {
+          return; // Not destroyed yet
+        }
+
+        // Actor is down -----
+        actor->inRemoveQueue = true;
+        Soleil::EventManager::Delay(0.0f, [group, actor](Soleil::Event& /*e*/) {
+          // Delay the removal of the node
+          group->removeChild(actor);
+        });
+        if (actor->getName() == "Player") {
+          Soleil::EventManager::Emit(
+            std::make_shared<Soleil::EventPlayerDestroyed>());
+        }
       }
 
       // TODO: I whish to have a triangle outpouring
@@ -880,12 +891,15 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   // First:
   for (int i = 0; i < 5; ++i) {
-    osg::ref_ptr<osg::MatrixTransform> first    = new osg::MatrixTransform;
-    constexpr float                    MinRange = 150;
-    constexpr float                    MaxRange = 275;
-    first->setMatrix(osg::Matrix::translate(
-      Random(MinRange, MaxRange), Random(MinRange, MaxRange), Random(-10, 10)));
+    osg::ref_ptr<Soleil::Actor> first    = new Soleil::Actor(1);
+    constexpr float             MinRange = 150;
+    constexpr float             MaxRange = 275;
+    // first->setMatrix(osg::Matrix::translate(
+    //   Random(MinRange, MaxRange), Random(MinRange, MaxRange), Random(-10,
+    //   10)));
     // first->setMatrix(osg::Matrix::translate(0, 150, 0));
+    first->setPosition(osg::Vec3(Random(MinRange, MaxRange),
+                                 Random(MinRange, MaxRange), Random(-10, 10)));
     first->addChild(templateEnnemy);
 
     osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;

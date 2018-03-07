@@ -80,9 +80,9 @@ namespace Soleil {
   {
     osg::NodeVisitor* visitor = data->asNodeVisitor();
     assert(visitor && "Class must be attached as a Callback visitor");
-    osg::MatrixTransform* node =
-      object->asNode()->asTransform()->asMatrixTransform();
-    assert(node && "Callback should be bound to MatrixTransform");
+    osg::PositionAttitudeTransform* node =
+      object->asNode()->asTransform()->asPositionAttitudeTransform();
+    assert(node && "Callback should be bound to a PositionAttitudeTransform");
 
     if (previousTime == 0.0f) {
       previousTime = visitor->getFrameStamp()->getSimulationTime();
@@ -95,7 +95,7 @@ namespace Soleil {
         ->asTransform()
         ->asPositionAttitudeTransform();
     const osg::Vec3 target  = playerNode->getPosition();
-    const osg::Vec3 current = node->getMatrix().getTrans();
+    const osg::Vec3 current = node->getPosition();
     const osg::Vec3 playerDirection =
       playerNode->getAttitude() * osg::Vec3(0, 1, 0);
 
@@ -237,21 +237,23 @@ namespace Soleil {
       osg::Vec3 new_up   = new_forward ^ new_side;       // cross product
 #endif
       const osg::Quat q = quatLookAt(new_forward, VectorUp());
-      osg::Matrix     m = node->getMatrix();
-      m.setRotate(q); //   * deltaTime
-      m *= osg::Matrix::translate(velocity * deltaTime);
+      // osg::Matrix     m = node->getMatrix();
+      // m.setRotate(q); //   * deltaTime
+      // m *= osg::Matrix::translate(velocity * deltaTime);
+      // const osg::Vec3 nextPosition = m.getTrans();
 
-      const osg::Vec3 nextPosition = m.getTrans();
+      const osg::Vec3 nextPosition = current + (velocity * deltaTime);
       osg::Vec3       collisionNormal;
-      if (Soleil::SceneManager::SegmentCollision(node->getMatrix().getTrans(),
-                                                 nextPosition, node,
+      if (Soleil::SceneManager::SegmentCollision(current, nextPosition, node,
                                                  &collisionNormal)) {
 
         osg::NodePath p = visitor->getNodePath();
         Soleil::EventManager::Emit(
           std::make_shared<Soleil::EventDestructObject>(p));
       } else {
-        node->setMatrix(m);
+        // node->setMatrix(m);
+        node->setAttitude(q);
+        node->setPosition(nextPosition);
       }
     }
 
