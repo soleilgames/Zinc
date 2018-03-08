@@ -81,12 +81,8 @@
 osg::ref_ptr<osg::PositionAttitudeTransform> PlayerNode;
 Soleil::EventManager                         SystemEventManager;
 
-// osg::Vec3                                    worldPosition;
-// osg::ref_ptr<osg::MatrixTransform>           PlaneNode;
-// osg::ref_ptr<osg::MatrixTransform>           GroupPtr;
-// osg::ref_ptr<osg::PositionAttitudeTransform> CameraBase;
-
 // TODO: Not here:
+osg::ref_ptr<osg::Geometry> hudPlaneLife;
 
 class DrawableStateCallback : public osg::Drawable::UpdateCallback
 {
@@ -685,6 +681,62 @@ CreateAlienShootPS(osg::Group& parent)
 
 /* --- Explosion with particles --- */
 
+static osg::ref_ptr<osg::Camera>
+CreateHUDCamera()
+{
+  osg::ref_ptr<osg::Camera> camera = new osg::Camera;
+  camera->setClearMask(GL_DEPTH_BUFFER_BIT);
+  camera->setRenderOrder(osg::Camera::POST_RENDER);
+  camera->setReferenceFrame(osg::Camera::ABSOLUTE_RF);
+
+  camera->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
+  // camera->setViewMatrixAsLookAt(osg::Vec3(-1.0f, -1.0f, 0.0f), osg::Vec3(),
+  //                               osg::Vec3(0.0f, 0.0f, 1.0f));
+  camera->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+
+  osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
+  osg::ref_ptr<osg::Image>     image =
+    osgDB::readImageFile("../media/hud/plane-life.png");
+  texture->setImage(image);
+  osg::ref_ptr<osg::Geometry> quad = osg::createTexturedQuadGeometry(
+    osg::Vec3(0.0f, 0.0f, 0.0f), osg::Vec3(0.15f, 0.0f, 0.0f),
+    osg::Vec3(0.0f, 0.267f, 0.0f), 0.0f, 0.5f, 0.5f, 1.0f);
+  {
+    // TODO: QUAD width: use Ratio from the screen
+    osg::StateSet* ss = quad->getOrCreateStateSet();
+    ss->setTextureAttributeAndModes(0, texture);
+  }
+  hudPlaneLife = quad;
+  hudPlaneLife->setDataVariance(osg::Object::DataVariance::DYNAMIC);
+  hudPlaneLife->setUseVertexBufferObjects(true);
+  hudPlaneLife->setUseDisplayList(false);
+
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+  {
+    osg::StateSet* ss = geode->getOrCreateStateSet();
+    ss->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+    geode->addDrawable(quad);
+  }
+  camera->addChild(geode);
+
+  // osg::ref_ptr<osg::Billboard> billboard = new osg::Billboard;
+  // {
+  //   billboard->setMode(osg::Billboard::POINT_ROT_EYE);
+  //   osg::StateSet* ss = billboard->getOrCreateStateSet();
+  //   ss->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+  //   billboard->addDrawable(quad, osg::Vec3(0.0f, 0.0f, 0.0f));
+  // }
+  // camera->addChild(billboard);
+
+  auto mask = camera->getNodeMask();
+  mask &= ~Soleil::SceneManager::Mask::Collision;
+  mask &= ~Soleil::SceneManager::Mask::Shootable;
+
+  camera->setNodeMask(mask);
+
+  return camera;
+}
+
 void
 FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 {
@@ -818,8 +870,22 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
       Soleil::Actor* actor = dynamic_cast<Soleil::Actor*>(event->object[2]);
       assert(actor && "Entity group shall accept only actors");
 
+      // TODO: Seperate in different class
       if (actor->inRemoveQueue == false) {
         actor->lifePoints--;
+        if (actor->getName() == "Player") {
+          const float     l = (actor->lifePoints == 2) ? 0.5f : 0.0f;
+          const float     r = l + 0.5f;
+          const float     b = (actor->lifePoints <= 1) ? 0.0f : 0.5f;
+          const float     t = b + 0.5f;
+          osg::Vec2Array* tcoords =
+            dynamic_cast<osg::Vec2Array*>(hudPlaneLife->getTexCoordArray(0));
+          (*tcoords)[0].set(l, t);
+          (*tcoords)[1].set(l, b);
+          (*tcoords)[2].set(r, b);
+          (*tcoords)[3].set(r, t);
+          tcoords->dirty();
+        }
         if (actor->lifePoints > 0) {
           return; // Not destroyed yet
         }
@@ -890,7 +956,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
   // First:
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < 15; ++i) {
     osg::ref_ptr<Soleil::Actor> first    = new Soleil::Actor(1);
     constexpr float             MinRange = 150;
     constexpr float             MaxRange = 275;
@@ -932,6 +998,10 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   assert(Soleil::GetPathByNodeName(*root, "Player").empty() == false);
   Soleil::SceneManager::RegisterNodePath(
     Soleil::ConstHash("Player"), Soleil::GetPathByNodeName(*root, "Player"));
+
+  // HUD Camera ---------------------------------------
+  osg::ref_ptr<osg::Camera> hud = CreateHUDCamera();
+  root->addChild(hud);
 
   SOLEIL__LOGGER_DEBUG("New level loaded");
 }
