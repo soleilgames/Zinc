@@ -30,6 +30,7 @@
 #include <osg/Texture2D>
 #include <osg/Texture3D>
 #include <osg/io_utils>
+#include <osgAnimation/BasicAnimationManager>
 #include <osgDB/ReadFile>
 #include <osgDB/Registry>
 #include <osgDB/WriteFile>
@@ -517,6 +518,19 @@ createPlayerGraph()
   osg::ref_ptr<osg::Node> cessna =
     osgDB::readNodeFile("../media/ZincAF100.osgt");
   assert(cessna.get() != nullptr && "Root is null");
+
+  osgAnimation::BasicAnimationManager* animNode =
+    dynamic_cast<osgAnimation::BasicAnimationManager*>(
+      cessna->getUpdateCallback());
+  if (animNode) {
+    for (auto&& anim : animNode->getAnimationList()) {
+      SOLEIL__LOGGER_DEBUG("PLAYING Anim: ", anim->getName());
+      animNode->playAnimation(anim);
+    }
+  } else {
+    SOLEIL__LOGGER_DEBUG("!!! NO ANNIMATION FOUND");
+  }
+
   group->addChild(cessna);
 
   group->setName("Player");
