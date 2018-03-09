@@ -163,6 +163,7 @@ ExplosionCullCallback::cull(osg::NodeVisitor* nv, osg::Drawable* drawable,
 
 // -----------
 
+// TODO: Will be member of a Level class
 class DrawableStateCallback;
 osg::ref_ptr<osg::Geode>                         shootTracers;
 osg::ref_ptr<osg::Billboard>                     explosion;
@@ -170,6 +171,7 @@ std::vector<osg::ref_ptr<DrawableStateCallback>> explosionImpostor;
 constexpr int                                    NumOfExplosions = 150;
 osg::ref_ptr<Soleil::ShootTracerCallback>        tracerUpdater;
 // TODO: NumOfExplosions = NumberPerFrame * TimeToLive
+std::function<void(const osg::Vec3& position, int mnumber)> CreateEnemyPatrol;
 
 /* --- PlayerFlightCameraManipulator */
 class PlayerFlightCameraManipulator : public osgGA::CameraManipulator
@@ -404,6 +406,24 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   //   } break;
   // }
 
+  // Debug ---
+
+  using KEY  = osgGA::GUIEventAdapter::KeySymbol;
+  using TYPE = osgGA::GUIEventAdapter::EventType;
+
+  if (event.getEventType() == TYPE::KEYUP) {
+    switch (event.getKey()) {
+      case KEY::KEY_O: {
+        // const osg::Vec3 frontOfPlayer = normalize(translate) * 300.0f;
+        const osg::Vec3 frontOfPlayer =
+          targetPosition + qResult * osg::Vec3(0, 200, 0);
+        // qResult * osg::Vec3(0.0f, Speed * delta, 0.0f) +
+        // PlayerNode->getPosition();
+        CreateEnemyPatrol(frontOfPlayer, 15);
+        break;
+      }
+    }
+  }
   return true;
 }
 
@@ -1029,7 +1049,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   osg::ref_ptr<osg::Node> templateEnnemy =
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
-  // First:
+// First:
+#if 0 // Create enemies at beginning
   for (int i = 0; i < 15; ++i) {
     osg::ref_ptr<Soleil::Actor> first    = new Soleil::Actor(1);
     constexpr float             MinRange = 150;
@@ -1048,6 +1069,26 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     // ac->velocity.y() = 25.0f;
     ennemies->addChild(first);
   }
+#endif
+  CreateEnemyPatrol = [ennemies, templateEnnemy](const osg::Vec3& position,
+                                                 int number) {
+    for (int i = 0; i < number; ++i) {
+
+      osg::ref_ptr<Soleil::Actor> first    = new Soleil::Actor(1);
+      constexpr float             MinRange = -30.0f;
+      constexpr float             MaxRange = +30.0f;
+
+      first->setPosition(osg::Vec3(position.x() + Random(MinRange, MaxRange),
+                                   position.y() + Random(MinRange, MaxRange),
+                                   Random(-10, 10)));
+      first->addChild(templateEnnemy);
+
+      osg::ref_ptr<Soleil::AlienCraft> ac = new Soleil::AlienCraft;
+      first->addUpdateCallback(ac);
+      first->setName(Soleil::toString("FirstEnnemy_N", i));
+      ennemies->addChild(first);
+    }
+  };
 
   root->addChild(ennemies);
 

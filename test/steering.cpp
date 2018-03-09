@@ -26,6 +26,7 @@
 #include "ParticleObjects.h"
 #include "SceneManager.h"
 #include "Utils.h"
+#include <functional>
 #include <osg/MatrixTransform>
 #include <osg/PositionAttitudeTransform>
 #include <osgDB/ReadFile>
@@ -33,6 +34,9 @@
 #include <osgParticle/ModularProgram>
 #include <osgParticle/ParticleSystemUpdater>
 #include <osgViewer/Viewer>
+
+constexpr float Range = 50;
+std::function<void(const osg::Vec3& position)> CreateAlienCraft;
 
 // ------- Alien Shoot
 // TODO: Set this method in ParticleObjects
@@ -100,7 +104,7 @@ DebugTrackball::handle(const osgGA::GUIEventAdapter& event,
 
   if (event.getEventType() == TYPE::KEYUP) {
     switch (event.getKey()) {
-      case KEY::KEY_P:
+      case KEY::KEY_P: {
         int mask = root->getNodeMask();
         if (mask == 1) {
           root->setNodeMask(0xffffffff);
@@ -108,6 +112,12 @@ DebugTrackball::handle(const osgGA::GUIEventAdapter& event,
           root->setNodeMask(1);
         };
         break;
+      }
+      case KEY::KEY_O: {
+        CreateAlienCraft(osg::Vec3(Random(-0.0f, Range), Random(-0.0f, Range),
+                                   Random(-1.0f, 3.0f)));
+        break;
+      }
     }
   }
   return TrackballManipulator::handle(event, us);
@@ -151,7 +161,7 @@ main(int // argc
   osg::ref_ptr<osg::Node>           templateEnnemy =
     osgDB::readNodeFile("../media/ZincEnnemyOne.osgt");
 
-  auto CreateAlienCraft =
+  CreateAlienCraft =
     [&ennemies, &templateEnnemy, num = 0 ](const osg::Vec3& position)
   {
     osg::ref_ptr<Soleil::Actor> first = new Soleil::Actor(1);
@@ -166,8 +176,7 @@ main(int // argc
   };
 // First:
 #if 1
-  for (int i = 0; i < 1; ++i) {
-    constexpr float Range = 50;
+  for (int i = 0; i < 0; ++i) {
     CreateAlienCraft(osg::Vec3(Random(-Range, Range), Random(-Range, Range),
                                Random(-Range, Range)));
   }
