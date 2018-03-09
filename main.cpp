@@ -21,9 +21,12 @@
 
 #include <cassert>
 
+#include <osg/BlendColor>
 #include <osg/BlendEquation>
 #include <osg/BlendFunc>
 #include <osg/Depth>
+#include <osg/Fog>
+#include <osg/Material>
 #include <osg/MatrixTransform>
 #include <osg/PositionAttitudeTransform>
 #include <osg/TexGen>
@@ -79,8 +82,8 @@
 
 // USE_GRAPHICSWINDOW()
 
-osg::ref_ptr<osg::PositionAttitudeTransform> PlayerNode;
-Soleil::EventManager                         SystemEventManager;
+osg::ref_ptr<Soleil::Actor> PlayerNode;
+Soleil::EventManager        SystemEventManager;
 
 // TODO: Not here:
 osg::ref_ptr<osg::Geometry> hudPlaneLife;
@@ -89,6 +92,7 @@ class DrawableStateCallback : public osg::Drawable::UpdateCallback
 {
 public:
   float time;
+  float speed; // TODO: Can be constepxr
 
 public:
   DrawableStateCallback(float speed)
@@ -100,6 +104,9 @@ public:
   // virtual void operator()(osg::Node *node, osg::NodeVisitor *nv) {
   void update(osg::NodeVisitor*, osg::Drawable* d)
   {
+    // if (d->getNodeMask() == 0) return;
+
+    // TODO: Have lesss image maybe just one that become transparant
 
     osg::StateAttribute* attribute =
       d->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXGEN);
@@ -109,12 +116,52 @@ public:
     texgen->getPlane(osg::TexGen::R)[3] = time;
     //}
 
+    // SOLEIL__LOGGER_DEBUG("> ", texgen->getPlane(osg::TexGen::R)[3]);
+    if (texgen->getPlane(osg::TexGen::R)[3] >= 1.0f) {
+      // d->setNodeMask(0);
+
+      // osg::ref_ptr<osg::BlendColor> mat = dynamic_cast<osg::BlendColor*>(
+      //
+      // d->getStateSet()->getAttribute(osg::StateAttribute::Type::BLENDCOLOR));
+      // assert(mat);
+
+      // osg::ref_ptr<osg::Material> mat = dynamic_cast<osg::Material*>(
+
+      //   d->getStateSet()->getAttribute(osg::StateAttribute::Type::MATERIAL));
+      // assert(mat);
+      // mat->setTransparency(osg::Material::FRONT_AND_BACK, 0.0f);
+      // SOLEIL__LOGGER_DEBUG("TTTTTTTTTTTTTTTTTTT");
+    }
+
     // traverse(node, nv);
   }
-
-private:
-  float speed;
 };
+
+class ExplosionCullCallback : public osg::DrawableCullCallback
+{
+public:
+  ExplosionCullCallback(osg::ref_ptr<DrawableStateCallback> state);
+  bool cull(osg::NodeVisitor* nv, osg::Drawable* drawable,
+            osg::RenderInfo* renderInfo) const override;
+
+  osg::ref_ptr<DrawableStateCallback> state;
+};
+
+ExplosionCullCallback::ExplosionCullCallback(
+  osg::ref_ptr<DrawableStateCallback> state)
+  : state(state)
+{
+}
+
+bool
+ExplosionCullCallback::cull(osg::NodeVisitor* nv, osg::Drawable* drawable,
+                            osg::RenderInfo* renderInfo) const
+{
+  if (state->time >= 1.0f) return true;
+  return DrawableCullCallback::cull(nv, drawable, renderInfo);
+}
+
+// -----------
 
 class DrawableStateCallback;
 osg::ref_ptr<osg::Geode>                         shootTracers;
@@ -122,7 +169,7 @@ osg::ref_ptr<osg::Billboard>                     explosion;
 std::vector<osg::ref_ptr<DrawableStateCallback>> explosionImpostor;
 constexpr int                                    NumOfExplosions = 150;
 osg::ref_ptr<Soleil::ShootTracerCallback>        tracerUpdater;
-//
+// TODO: NumOfExplosions = NumberPerFrame * TimeToLive
 
 /* --- PlayerFlightCameraManipulator */
 class PlayerFlightCameraManipulator : public osgGA::CameraManipulator
@@ -273,13 +320,15 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
 
   if (Soleil::SceneManager::SegmentCollision(currentPosition, nextPosition,
                                              PlayerNode, &collisionNormal)) {
+    // TODO: Seperate Object destruction and object touched Events
+    PlayerNode->lifePoints = 0;
     Soleil::EventManager::Emit(std::make_shared<Soleil::EventDestructObject>(
       Soleil::SceneManager::GetNodePath(Soleil::ConstHash("Player"))));
-    Soleil::EventManager::Emit(std::make_shared<Soleil::EventGameOver>());
+    // Soleil::EventManager::Emit(std::make_shared<Soleil::EventGameOver>());
     // Soleil::EventManager::Delay(
     //   3.0, std::make_shared<Soleil::EventLoadLevel>("first"));
-    SystemEventManager.delay(3.0,
-                             std::make_shared<Soleil::EventLoadLevel>("first"));
+    // SystemEventManager.delay(3.0,
+    //                          std::make_shared<Soleil::EventLoadLevel>("first"));
     userControl = false;
   } else {
     // PlayerNode->setMatrix(matrix);
@@ -421,7 +470,7 @@ convertImageListTo3Dstate(std::vector<std::string> files)
   // will do the blending for us.
   osg::ref_ptr<osg::TexGen> texgen = new osg::TexGen;
   texgen->setMode(osg::TexGen::OBJECT_LINEAR);
-  texgen->setPlane(osg::TexGen::R, osg::Plane(0.0f, 0.0f, 0.0f, 0.0f));
+  texgen->setPlane(osg::TexGen::R, osg::Plane(0.0f, 0.0f, 0.0f, 10.0f));
 
   // create the StateSet to store the texture data
   osg::ref_ptr<osg::StateSet> stateset = new osg::StateSet;
@@ -440,31 +489,6 @@ convertImageListTo3Dstate(std::vector<std::string> files)
 
   return stateset;
 }
-
-class UpdateStateCallback : public osg::NodeCallback
-{
-public:
-  UpdateStateCallback(osg::StateSet* stateset)
-    : stateset(stateset)
-  {
-  }
-
-  virtual void operator()(osg::Node* node, osg::NodeVisitor* nv)
-  {
-
-    osg::StateAttribute* attribute =
-      stateset->getTextureAttribute(0, osg::StateAttribute::TEXGEN);
-    osg::TexGen* texgen = dynamic_cast<osg::TexGen*>(attribute);
-    // if (texgen) {
-    texgen->getPlane(osg::TexGen::R)[3] += 1.00f / 17.0f; // TODO: Framerate
-    //}
-
-    traverse(node, nv);
-  }
-
-private:
-  osg::StateSet* stateset;
-};
 
 /* --- Create texture 3D from a list of texture 2D --- */
 
@@ -493,21 +517,31 @@ createExplosionQuad()
     std::cout << s << "\n";
     files.push_back(s);
   }
+  // files.push_back("../media/textures/0000.png");
 
   osg::ref_ptr<osg::StateSet> texture3d = convertImageListTo3Dstate(files);
   quad->setStateSet(texture3d);
 #endif
 
-  quad->setNodeMask(quad->getNodeMask() &
-                    (~Soleil::SceneManager::Mask::Shootable |
-                     ~Soleil::SceneManager::Mask::Collision));
+  // osg::ref_ptr<osg::Material> material = new osg::Material;
+  // material->setAmbient(osg::Material::FRONT_AND_BACK,
+  //                      osg::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
+  // material->setDiffuse(osg::Material::FRONT_AND_BACK,
+  //                      osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+  // quad->getOrCreateStateSet()->setAttributeAndModes(
+  //   material, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+
+  // quad->setNodeMask(quad->getNodeMask() &
+  //                   (~Soleil::SceneManager::Mask::Shootable |
+  //                    ~Soleil::SceneManager::Mask::Collision));
+  // quad->setNodeMask(0);
   quad->setName("Explosion");
   return quad;
 }
 
 /* --- Explosion Impostor --- */
 
-static osg::ref_ptr<osg::PositionAttitudeTransform>
+static osg::ref_ptr<Soleil::Actor>
 createPlayerGraph()
 {
   // osg::ref_ptr<osg::PositionAttitudeTransform> group =
@@ -757,7 +791,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   SOLEIL__LOGGER_DEBUG("Loading new level...");
   Soleil::EventManager::Init();
 
-  osg::ref_ptr<osg::PositionAttitudeTransform> plane  = createPlayerGraph();
+  osg::ref_ptr<Soleil::Actor>       plane             = createPlayerGraph();
   osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup = new Soleil::EntityGroup;
   playerEntityGroup->addChild(plane);
   playerEntityGroup->setName("PlayerEntityGroup");
@@ -789,6 +823,29 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
                      ~Soleil::SceneManager::Mask::Shootable);
   model->setName("Level");
   root->addChild(model);
+
+// Fog:
+#if 0
+  osg::ref_ptr<osg::Node> fogModel =
+    osgDB::readNodeFile("../media/ZincFog.osgt");
+  {
+    auto mask = fogModel->getNodeMask();
+    mask &= ~Soleil::SceneManager::Mask::Collision;
+    mask &= ~Soleil::SceneManager::Mask::Shootable;
+    fogModel->setNodeMask(mask);
+  }
+  osg::ref_ptr<osg::Fog> fog = new osg::Fog;
+  fog->setMode(osg::Fog::LINEAR);
+  fog->setStart(0.10f);
+  fog->setEnd(10.0f);
+  fog->setDensity(1000.0f);
+  fog->setFogCoordinateSource(GL_FOG_COORD);
+  fog->setColor(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+  fogModel->getOrCreateStateSet()->setAttributeAndModes(fog);
+  fogModel->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
+  root->addChild(fogModel);
+#endif
+
   // Soleil::SceneManager::Init(model);
   Soleil::SceneManager::Init(root);
 
@@ -817,6 +874,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   //                      osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
   // ss->setAttributeAndModes(blend, osg::StateAttribute::ON);
 
+  explosionImpostor.clear();
   osg::ref_ptr<osg::Geometry> ex = createExplosionQuad();
   for (int i = 0; i < NumOfExplosions; ++i) {
     osg::ref_ptr<osg::Geometry> dup = dynamic_cast<osg::Geometry*>(
@@ -827,6 +885,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
       new DrawableStateCallback(Random(50.0f) + 50.0f);
     explosionImpostor.push_back(cb);
     dup->setUpdateCallback(cb);
+    dup->setCullCallback(new ExplosionCullCallback(cb));
+
     // TODO: -1000 in z to avoid to see them. Find another solution (a pool)
     explosion->addDrawable(dup, osg::Vec3(0.0f, (float)i, -1000.0f));
   }

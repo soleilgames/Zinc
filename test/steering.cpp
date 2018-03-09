@@ -128,7 +128,7 @@ main(int // argc
 
   // Add the Player -------------------------------------
   osg::ref_ptr<osg::Node> playerModel =
-    osgDB::readNodeFile("../media/Player.osgt");
+    osgDB::readNodeFile("../media/ZincAF100.osgt");
   osg::ref_ptr<osg::PositionAttitudeTransform> player =
     new osg::PositionAttitudeTransform;
   player->setName("Player");
@@ -165,8 +165,8 @@ main(int // argc
     ennemies->addChild(first);
   };
 // First:
-#if 0
-  for (int i = 0; i < 10; ++i) {
+#if 1
+  for (int i = 0; i < 1; ++i) {
     constexpr float Range = 50;
     CreateAlienCraft(osg::Vec3(Random(-Range, Range), Random(-Range, Range),
                                Random(-Range, Range)));

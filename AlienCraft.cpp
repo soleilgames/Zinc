@@ -33,6 +33,7 @@
 
 // // TODO: remove Debug:
 #include <osgDB/ReadFile>
+#include <osg/MatrixTransform>
 //#define SOLEIL__DEBUG_STEERING 1
 
 namespace Soleil {
