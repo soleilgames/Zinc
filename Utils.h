@@ -108,12 +108,13 @@ namespace Soleil {
     return camera;
   }
 
-  inline osg::ref_ptr<osg::Geode> createScreenQuad(float width, float height,
-                                                   float scale = 1.0f)
+  inline osg::ref_ptr<osg::Geode> createScreenQuad(
+    float width, float height, const osg::Vec3& corner = osg::Vec3(),
+    float scale = 1.0f)
   {
     osg::ref_ptr<osg::Geometry> geom = osg::createTexturedQuadGeometry(
-      osg::Vec3(), osg::Vec3(width, 0.0f, 0.0f), osg::Vec3(0.0f, height, 0.0f),
-      0.0f, 0.0f, 1.0f * scale, 1.0f * scale);
+      corner, osg::Vec3(width, 0.0f, 0.0f), osg::Vec3(0.0f, height, 0.0f), 0.0f,
+      0.0f, 1.0f * scale, 1.0f * scale);
     osg::ref_ptr<osg::Geode> quad = new osg::Geode;
     quad->addDrawable(geom);
     const int values =

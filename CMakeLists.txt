@@ -72,6 +72,7 @@ SET(ZINC_ENGINE_SRC
   Actor.cpp
   AlienCraft.cpp
   ParticleObjects.cpp
+  VolumetricFog.cpp
   #CloudBlock.cpp
   )
 
