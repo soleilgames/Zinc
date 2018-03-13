@@ -542,6 +542,35 @@ convertImageListTo3Dstate(std::vector<std::string> files)
 
 /* --- Create texture 3D from a list of texture 2D --- */
 
+/* --- Volumetric Fog --- */
+
+static void
+ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
+{
+  osg::ref_ptr<osg::Camera> rttCameraFront;
+  {
+    osg::ref_ptr<osg::Texture2D> tex2D = new osg::Texture2D;
+    tex2D->setTextureSize(1024, 1024);
+    tex2D->setInternalFormat(GL_DEPTH_COMPONENT24);
+    tex2D->setSourceFormat(GL_DEPTH_COMPONENT);
+    tex2D->setSourceType(GL_FLOAT);
+
+    rttCameraFront = Soleil::createRTTCamera(osg::Camera::DEPTH_BUFFER, tex2D);
+    rttCameraFront->addChild(scene);
+
+    osg::ref_ptr<osg::Camera> hudCamera =
+      Soleil::createHUDCamera(0.0, 1.0, 0.0, 1.0);
+    hudCamera->addChild(Soleil::createScreenQuad(.10f, .10f, 1.0f));
+    hudCamera->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
+    hudCamera->setNodeMask(Soleil::SceneManager::Mask::Render);
+
+    root->addChild(rttCameraFront);
+    root->addChild(hudCamera);
+  }
+}
+
+/* --- Volumetric Fog --- */
+
 /* --- Explosion Impostor --- */
 
 osg::ref_ptr<osg::Geometry>
@@ -921,7 +950,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     mask &= ~Soleil::SceneManager::Mask::Shootable;
     fogModel->setNodeMask(mask);
   }
-  //root->addChild(fogModel);
+  // root->addChild(fogModel);
 
   // Add fog
   osg::ref_ptr<osg::Fog> fog = new osg::Fog;
@@ -938,9 +967,9 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   // Particles Floor: -------------------------------------
   {
-    osg::Group&                               parent = *root;
-    //osg::Group&                               parent = *skybox;
-    constexpr float                           scale  = 100.0f;
+    osg::Group& parent = *root;
+    // osg::Group&                               parent = *skybox;
+    constexpr float                           scale = 100.0f;
     osg::ref_ptr<osgParticle::ParticleSystem> ps =
       new osgParticle::ParticleSystem;
 
@@ -1257,6 +1286,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   osg::ref_ptr<osg::Camera> hud = CreateHUDCamera();
   root->addChild(hud);
 
+  ApplyDepthCamera(root, model);
+
   SOLEIL__LOGGER_DEBUG("New level loaded");
 }
 
@@ -1270,6 +1301,10 @@ main(int // argc
   root->setName("ROOT");
   osgViewer::Viewer viewer;
   viewer.setLightingMode(osg::View::SKY_LIGHT);
+
+  viewer.getCamera()->setComputeNearFarMode(
+    osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR); // TODO: Added for RTT - Reduce
+                                                 // the depth brightness
 
   SystemEventManager.enroll(Soleil::EventLoadLevel::Type(),
                             [root, &viewer](Soleil::Event& /*e*/) {
