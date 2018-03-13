@@ -21,6 +21,7 @@
 
 #include <cassert>
 
+#include "CloudBlock"
 #include <osg/BlendColor>
 #include <osg/BlendEquation>
 #include <osg/BlendFunc>
@@ -160,6 +161,35 @@ ExplosionCullCallback::cull(osg::NodeVisitor* nv, osg::Drawable* drawable,
   if (state->time >= 1.0f) return true;
   return DrawableCullCallback::cull(nv, drawable, renderInfo);
 }
+
+class FogStateCallback : public osg::Callback
+{
+public:
+  osg::ref_ptr<osg::Fog> fog;
+
+  FogStateCallback(osg::ref_ptr<osg::Fog> fog)
+    : fog(fog)
+  {
+  }
+
+  bool run(osg::Object* object, osg::Object* data)
+  {
+    const float position = static_cast<float>(PlayerNode->getPosition().z());
+
+    if (position < -50.0f) {
+      const float fogEnd = osg::maximum(
+        20.0f,
+        100.0f * static_cast<float>(QuarticEaseIn(std::abs(50.0f / position))));
+
+      fog->setEnd(fogEnd); // TODO: No hard code
+      object->asNode()->getStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
+    } else {
+      object->asNode()->getStateSet()->setMode(GL_FOG,
+                                               osg::StateAttribute::OFF);
+    }
+    return traverse(object, data);
+  }
+};
 
 // -----------
 
@@ -419,7 +449,7 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
           targetPosition + qResult * osg::Vec3(0, 200, 0);
         // qResult * osg::Vec3(0.0f, Speed * delta, 0.0f) +
         // PlayerNode->getPosition();
-        CreateEnemyPatrol(frontOfPlayer, 15);
+        CreateEnemyPatrol(frontOfPlayer, 1);
         break;
       }
     }
@@ -856,14 +886,123 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   }
   osg::ref_ptr<osg::Fog> fog = new osg::Fog;
   fog->setMode(osg::Fog::LINEAR);
-  fog->setStart(0.10f);
-  fog->setEnd(10.0f);
-  fog->setDensity(1000.0f);
-  fog->setFogCoordinateSource(GL_FOG_COORD);
+  // fog->setStart(0.10f);
+  // fog->setEnd(10.0f);
+  // fog->setDensity(1000.0f);
+  //fog->setFogCoordinateSource(osg::Fog::FogCoordinateSource::FOG_COORDINATE);
+  fog->setFogCoordinateSource(osg::Fog::FogCoordinateSource::FRAGMENT_DEPTH);
   fog->setColor(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
-  fogModel->getOrCreateStateSet()->setAttributeAndModes(fog);
-  fogModel->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
-  root->addChild(fogModel);
+  // fogModel->getOrCreateStateSet()->setAttributeAndModes(fog);
+  // fogModel->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
+  root->getOrCreateStateSet()->setAttributeAndModes(fog);
+  root->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
+
+  osg::ref_ptr<osg::Geometry> cube =
+    Soleil::GetNodeByName(*fogModel, "Cube_0")->asGeometry();
+  assert(cube);
+  cube->setFogCoordArray(cube->getVertexArray());
+
+  skybox->addChild(fogModel);
+  //root->addChild(fogModel);
+#elif 1
+  osg::ref_ptr<osg::Node> fogModel =
+    osgDB::readNodeFile("../media/ZincFogSurface.osgt");
+  fogModel->getOrCreateStateSet()->setRenderingHint(
+    osg::StateSet::TRANSPARENT_BIN);
+  fogModel->getOrCreateStateSet()->setMode(GL_LIGHTING,
+                                           osg::StateAttribute::OFF);
+  // osg::ref_ptr<osg::StateAttribute> blend =
+  //   new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
+  //                      osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
+  // stateset->setAttributeAndModes(blend, osg::StateAttribute::ON);
+  {
+    auto mask = fogModel->getNodeMask();
+    mask &= ~Soleil::SceneManager::Mask::Collision;
+    mask &= ~Soleil::SceneManager::Mask::Shootable;
+    fogModel->setNodeMask(mask);
+  }
+  //root->addChild(fogModel);
+
+  // Add fog
+  osg::ref_ptr<osg::Fog> fog = new osg::Fog;
+  fog->setMode(osg::Fog::LINEAR);
+  fog->setStart(1.00f);
+  fog->setEnd(300.0f);
+  fog->setDensity(0.1000f);
+  // fog->setFogCoordinateSource(GL_FOG_COORD);
+  fog->setFogCoordinateSource(osg::Fog::FogCoordinateSource::FRAGMENT_DEPTH);
+  fog->setColor(osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f));
+  root->getOrCreateStateSet()->setAttributeAndModes(fog);
+  root->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
+  root->addUpdateCallback(new FogStateCallback(fog));
+
+  // Particles Floor: -------------------------------------
+  {
+    osg::Group&                               parent = *root;
+    //osg::Group&                               parent = *skybox;
+    constexpr float                           scale  = 100.0f;
+    osg::ref_ptr<osgParticle::ParticleSystem> ps =
+      new osgParticle::ParticleSystem;
+
+    ps->setDefaultAttributes("Images/smoke.rgb", false, false);
+
+    float radius  = 0.4f * scale;
+    float density = 1.2f; // 1.0kg/m^3
+
+    auto& defaultParticleTemplate = ps->getDefaultParticleTemplate();
+    defaultParticleTemplate.setLifeTime(0);
+    defaultParticleTemplate.setSizeRange(osgParticle::rangef(0.75f, 3.0f));
+    defaultParticleTemplate.setAlphaRange(osgParticle::rangef(0.1f, 1.0f));
+    defaultParticleTemplate.setColorRange(
+      osgParticle::rangev4(osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f),
+                           osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f)));
+    defaultParticleTemplate.setRadius(radius);
+    defaultParticleTemplate.setMass(density * radius * radius * radius *
+                                    osg::PI * 4.0f / 3.0f);
+
+    osg::ref_ptr<osgParticle::ModularProgram> program =
+      new osgParticle::ModularProgram;
+    program->setParticleSystem(ps);
+
+    osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+    geode->addDrawable(ps);
+    parent.addChild(program);
+    parent.addChild(geode);
+
+    osg::ref_ptr<osgParticle::ParticleSystemUpdater> updater =
+      new osgParticle::ParticleSystemUpdater;
+    updater->addParticleSystem(ps);
+    parent.addChild(updater);
+    // Soleil::SceneManager::RegisterParticleSystem(42, ps);
+    // ---
+    osg::ref_ptr<osgParticle::RandomRateCounter> rrc =
+      new osgParticle::RandomRateCounter;
+    rrc->setRateRange(600, 600);
+    osg::ref_ptr<osgParticle::ModularEmitter> emitter =
+      new osgParticle::ModularEmitter;
+    // emitter->setParticleSystem(ps);
+    emitter->setCounter(rrc);
+    emitter->setEndless(false);
+    emitter->setLifeTime(.10f);
+
+    osg::ref_ptr<osgParticle::RadialShooter> shooter =
+      new osgParticle::RadialShooter;
+    osg::ref_ptr<osgParticle::SectorPlacer> placer =
+      new osgParticle::SectorPlacer;
+
+    emitter->setPlacer(placer);
+    emitter->setShooter(shooter);
+
+    placer->setCenter(osg::Vec3(0, 0, -45)); // -50
+    placer->setRadiusRange(0.0f * scale, 0.25f * scale);
+
+    // shooter->setThetaRange(0.0f, osg::PI * 2.0f);
+    shooter->setInitialSpeedRange(0.0f, 0.0f);
+
+    emitter->setParticleSystem(ps);
+    parent.addChild(emitter);
+  }
+
 #endif
 
   // Soleil::SceneManager::Init(model);
@@ -1130,6 +1269,7 @@ main(int // argc
   osg::ref_ptr<osg::Group> root = new osg::Group();
   root->setName("ROOT");
   osgViewer::Viewer viewer;
+  viewer.setLightingMode(osg::View::SKY_LIGHT);
 
   SystemEventManager.enroll(Soleil::EventLoadLevel::Type(),
                             [root, &viewer](Soleil::Event& /*e*/) {

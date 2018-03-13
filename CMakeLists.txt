@@ -9,6 +9,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # set(OSG_DIR /home/florian/jeux/OpenSceneGraph/build/INST)
 find_package(OpenSceneGraph REQUIRED osgDB osgUtil osgViewer osgGA osgParticle osgAnimation) # NO_CMAKE_PATH # osgDB osgUtil
 
+# Used by cloud example:
+# find_package(OpenGL REQUIRED)
+# find_package(GLUT REQUIRED)
 
 
 # find_package(OpenGL REQUIRED)
@@ -52,7 +55,10 @@ find_package(OpenSceneGraph REQUIRED osgDB osgUtil osgViewer osgGA osgParticle o
 
 include_directories(
   ${OPENSCENEGRAPH_INCLUDE_DIRS}
+
+  ${OPENGL_INCLUDE_DIRS}  ${GLUT_INCLUDE_DIRS}
   )
+
 
 SET(ZINC_ENGINE_SRC
   easing.c
@@ -66,6 +72,7 @@ SET(ZINC_ENGINE_SRC
   Actor.cpp
   AlienCraft.cpp
   ParticleObjects.cpp
+  #CloudBlock.cpp
   )
 
 add_executable(zinc-osg
@@ -80,6 +87,7 @@ target_link_libraries(zinc-osg
   )
 
 
+
 add_executable(steering
   test/steering.cpp
 
@@ -90,3 +98,17 @@ target_include_directories(steering PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(steering
   ${OPENSCENEGRAPH_LIBRARIES}
   )
+
+
+# add_executable(clouds
+#   test/clouds.cpp
+
+#   ${ZINC_ENGINE_SRC}
+#   )
+# target_include_directories(clouds PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+# target_link_libraries(clouds
+#   ${OPENSCENEGRAPH_LIBRARIES}
+
+#   ${OPENGL_LIBRARIES} ${GLUT_LIBRARY}
+#   )
