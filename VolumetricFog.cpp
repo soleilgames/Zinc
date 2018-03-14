@@ -21,6 +21,7 @@
 
 #include "VolumetricFog.h"
 
+#include "Logger.h"
 #include <osg/Program>
 #include <osg/Shader>
 
@@ -58,6 +59,35 @@ namespace Soleil {
     program->addShader(new osg::Shader(osg::Shader::VERTEX, vertSource));
     program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
     return program;
+  }
+
+  CopyTextureOnCondition::CopyCallBack::CopyCallBack(
+    Condition condition, osg::ref_ptr<osg::Texture2D> texture)
+    : condition(condition)
+    , texture(texture)
+  {
+  }
+
+  void CopyTextureOnCondition::CopyCallBack::drawImplementation(
+    osg::RenderInfo& renderInfo, const osg::Drawable*) const
+  {
+    osg::Vec3d eye;
+    osg::Vec3d center;
+    osg::Vec3d up;
+    renderInfo.getView()->getCamera()->getViewMatrixAsLookAt(eye, center, up);
+    SOLEIL__LOGGER_DEBUG("Camera position: ", eye);
+
+    if (condition(eye)) {
+      texture->copyTexImage2D(*renderInfo.getState(), 0, 0,
+                              texture->getTextureWidth(),
+                              texture->getTextureHeight());
+    }
+  }
+
+  CopyTextureOnCondition::CopyTextureOnCondition(
+    Condition condition, osg::ref_ptr<osg::Texture2D> texture)
+  {
+    this->setDrawCallback(new CopyCallBack(condition, texture));
   }
 
 } // Soleil

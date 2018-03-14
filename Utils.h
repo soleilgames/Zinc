@@ -132,6 +132,7 @@ namespace Soleil {
     bool isAbsolute = false)
   {
     osg::ref_ptr<osg::Camera> camera = new osg::Camera;
+    camera->setAllowEventFocus(false);
     camera->setClearColor(osg::Vec4());
     camera->setClearMask(GL_COLOR_BUFFER_BIT |
                          GL_DEPTH_BUFFER_BIT); // TODO: Don't clear everything
@@ -148,7 +149,7 @@ namespace Soleil {
       camera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
       camera->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
       camera->setViewMatrix(osg::Matrix::identity());
-      camera->addChild(createScreenQuad(1.0f, 1.0f));
+      //camera->addChild(createScreenQuad(1.0f, 1.0f));
     }
     return camera;
   }

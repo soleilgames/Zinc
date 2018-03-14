@@ -55,7 +55,6 @@
 
 #include <osg/Timer>
 
-#include "VolumetricFog.h"
 #include "Actor.h"
 #include "AlienCraft.h"
 #include "EntityGroup.h"
@@ -67,6 +66,7 @@
 #include "ShootTracer.h"
 #include "SkyBox.h"
 #include "Utils.h"
+#include "VolumetricFog.h"
 #include "easing.h"
 #include "stringutils.h"
 
@@ -90,6 +90,7 @@ Soleil::EventManager        SystemEventManager;
 
 // TODO: Not here:
 osg::ref_ptr<osg::Geometry> hudPlaneLife;
+osg::ref_ptr<osg::Group>    superRoot; // TODO: temp
 
 class DrawableStateCallback : public osg::Drawable::UpdateCallback
 {
@@ -550,6 +551,15 @@ convertImageListTo3Dstate(std::vector<std::string> files)
 static void
 ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
 {
+  // // MUST: Be rendered after the scene
+  // osg::ref_ptr<osg::Texture2D> sceneBuffer = new osg::Texture2D;
+  // sceneBuffer->setTextureSize(1024, 1024); // TODO: Real Size
+  // sceneBuffer->setInternalFormat(GL_RGBA);
+  // auto drawable = new Soleil::CopyTextureOnCondition(
+  //   [](const osg::Vec3& /*eye*/) { return true; }, sceneBuffer);
+  // // drawable->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
+  // root->addChild(drawable);
+
   osg::ref_ptr<osg::Camera> hudCamera =
     Soleil::createHUDCamera(0.0, 1.0, 0.0, 1.0);
   root->addChild(hudCamera);
@@ -601,12 +611,12 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
     // quad->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
 
     root->addChild(rttCameraFogBack);
-    //root->addChild(g);
+    // root->addChild(g);
   }
 
-  // Render the scene into an off-screen buffer B (or copy it from buffer A
-  // before step 3 takes place), using the w depth alpha encoding.
-  // TODO: COPY COPY
+  // If the camera is not inside fog, render the scene into an off-screen buffer
+  // B (or copy it from buffer A before step 2 takes place), using the w depth
+  // alpha encoding. Otherwise, skip this step.
   osg::ref_ptr<osg::Texture2D> bufferB = new osg::Texture2D;
   osg::ref_ptr<osg::Camera>    rttCameraFrontAgain;
   {
@@ -615,6 +625,7 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
     bufferB->setSourceFormat(GL_DEPTH_COMPONENT);
     bufferB->setSourceType(GL_FLOAT);
 
+#if 0
     rttCameraFrontAgain =
       Soleil::createRTTCamera(osg::Camera::DEPTH_BUFFER, bufferB);
     rttCameraFrontAgain->addChild(scene);
@@ -622,8 +633,18 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
     //   Soleil::createScreenQuad(1.0f, 1.0f);
     // rttCameraFrontAgain->addChild(quad);
 
-    // TODO: Comment for innner fog
+    //If used camera has to render only if the main camera is not inside the fog
     root->addChild(rttCameraFrontAgain);
+#elif 1
+    auto drawable = new Soleil::CopyTextureOnCondition(
+      [fogModel](const osg::Vec3& eye) {
+        return fogModel->getBound().contains(eye) == false;
+        // TODO: HULL
+      },
+      bufferB);
+    drawable->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
+    rttCameraFogBack->addChild(drawable);
+#endif
   }
 
   // Render the front side of the fog volume into off-screen buffer B with w
@@ -654,16 +675,14 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
   }
 
   // Subtract the two buffers in screen space using the alpha value to blend on
-  // a
-  // fog mask.
-  // TODO:
-
+  // a fog mask.
   osg::ref_ptr<osg::Texture2D> sceneBuffer = new osg::Texture2D;
   sceneBuffer->setTextureSize(1024, 1024); // TODO: Real Size
   sceneBuffer->setInternalFormat(GL_RGBA);
   osg::ref_ptr<osg::Camera> rttCamera =
     Soleil::createRTTCamera(osg::Camera::COLOR_BUFFER, sceneBuffer);
-  rttCamera->addChild(scene.get());
+  rttCamera->addChild(scene);
+  //rttCamera->setAllowEventFocus(true);
   auto quad = Soleil::createScreenQuad(0.5f, 1.0f);
   hudCamera->addChild(quad);
   osg::StateSet* stateset = quad->getOrCreateStateSet();
@@ -1426,6 +1445,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   osg::ref_ptr<osg::Camera> hud = CreateHUDCamera();
   root->addChild(hud);
 
+  //ApplyDepthCamera(superRoot, root); // TODO: Clear super root
   ApplyDepthCamera(root, model);
 
   SOLEIL__LOGGER_DEBUG("New level loaded");
@@ -1439,6 +1459,9 @@ main(int // argc
 {
   osg::ref_ptr<osg::Group> root = new osg::Group();
   root->setName("ROOT");
+  superRoot = new osg::Group(); // TODO: Clean and rename
+  superRoot->setName("SUPER ROOT");
+  superRoot->addChild(root);
   osgViewer::Viewer viewer;
   viewer.setLightingMode(osg::View::SKY_LIGHT);
 
@@ -1463,7 +1486,8 @@ main(int // argc
   // --------------------------------------------
   // Attach the scene
   viewer.addEventHandler(new osgViewer::StatsHandler());
-  viewer.setSceneData(root);
+  // viewer.setSceneData(root);
+  viewer.setSceneData(superRoot);
 
   viewer.realize();
 

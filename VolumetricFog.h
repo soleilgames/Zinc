@@ -22,11 +22,35 @@
 #ifndef SOLEIL__VOLUMETRICFOG_H_
 #define SOLEIL__VOLUMETRICFOG_H_
 
+#include <functional>
+#include <osg/Drawable>
 #include <osg/Program>
+#include <osg/Texture2D>
 
 namespace Soleil {
 
   osg::ref_ptr<osg::Program> CreateVolumetricFogProgram();
+
+  class CopyTextureOnCondition : public osg::Drawable
+  {
+  public:
+    typedef std::function<bool(const osg::Vec3& eye)> Condition;
+
+    class CopyCallBack : public osg::Drawable::DrawCallback
+    {
+    public:
+      CopyCallBack(Condition condition, osg::ref_ptr<osg::Texture2D> texture);
+      void drawImplementation(osg::RenderInfo&,
+                              const osg::Drawable*) const override;
+
+    protected:
+      Condition                    condition;
+      osg::ref_ptr<osg::Texture2D> texture;
+    };
+
+    CopyTextureOnCondition(Condition                    condition,
+                           osg::ref_ptr<osg::Texture2D> texture);
+  };
 
 } // Soleil
 
