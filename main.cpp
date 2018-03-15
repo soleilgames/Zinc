@@ -620,10 +620,10 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
   // alpha encoding. Otherwise, skip this step.
   osg::ref_ptr<osg::Texture2D> bufferB = new osg::Texture2D;
   //{
-    bufferB->setTextureSize(1024, 1024);
-    bufferB->setInternalFormat(GL_DEPTH_COMPONENT24);
-    bufferB->setSourceFormat(GL_DEPTH_COMPONENT);
-    bufferB->setSourceType(GL_FLOAT);
+  bufferB->setTextureSize(1024, 1024);
+  bufferB->setInternalFormat(GL_DEPTH_COMPONENT24);
+  bufferB->setSourceFormat(GL_DEPTH_COMPONENT);
+  bufferB->setSourceType(GL_FLOAT);
 
 #if 0
     osg::ref_ptr<osg::Camera>    rttCameraFrontAgain;
@@ -637,32 +637,31 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
     //If used camera has to render only if the main camera is not inside the fog
     //root->addChild(rttCameraFrontAgain);
 #elif 1
-    osg::ref_ptr<osg::Geometry> cube =
-      Soleil::GetNodeByName(*fogModel, "Cube_0")->asGeometry();
-    assert(cube);
-    osg::Vec3Array* points =
-      dynamic_cast<osg::Vec3Array*>(cube->getVertexArray());
-    assert(points);
+  osg::ref_ptr<osg::Geometry> cube =
+    Soleil::GetNodeByName(*fogModel, "Cube_0")->asGeometry();
+  assert(cube);
+  osg::Vec3Array* points =
+    dynamic_cast<osg::Vec3Array*>(cube->getVertexArray());
+  assert(points);
 
-    osg::ref_ptr<osgUtil::DelaunayConstraint> c =
-      new osgUtil::DelaunayConstraint;
-    c->getPoints(points);
+  osg::ref_ptr<osgUtil::DelaunayConstraint> c = new osgUtil::DelaunayConstraint;
+  c->getPoints(points);
 
-    auto box = cube->computeBoundingBox();
+  auto box = cube->computeBoundingBox();
 
-    auto isNotInsideFog = [fogModel, c, box](const osg::Vec3& eye) {
-      // return fogModel->getBound().contains(eye) == false;
-      // return c->contains(eye) == false;
-      return box.contains(eye) == false;
-      // TODO: HULL
-    };
+  auto isNotInsideFog = [fogModel, c, box](const osg::Vec3& eye) {
+    // return fogModel->getBound().contains(eye) == false;
+    // return c->contains(eye) == false;
+    return box.contains(eye) == false;
+    // TODO: HULL
+  };
 
-    auto copyTexture =
-      new Soleil::CopyTextureOnCondition(isNotInsideFog, bufferB);
-    copyTexture->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
-    rttCameraFogBack->addChild(copyTexture);
+  auto copyTexture =
+    new Soleil::CopyTextureOnCondition(isNotInsideFog, bufferB);
+  copyTexture->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
+  rttCameraFogBack->addChild(copyTexture);
 #endif
-    //}
+  //}
 
   // Render the front side of the fog volume into off-screen buffer B with w
   // alpha encoding. Since the fog volume should be in front of parts of the
@@ -672,7 +671,8 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
     rttCameraFogFront =
       Soleil::createRTTCamera(osg::Camera::DEPTH_BUFFER, bufferB);
     rttCameraFogFront->setClearMask(0);
-    rttCameraFogFront->setPreDrawCallback(new Soleil::ClearScreenOnCondition(isNotInsideFog));
+    rttCameraFogFront->setPreDrawCallback(
+      new Soleil::ClearScreenOnCondition(isNotInsideFog));
     // cull front faces
     osg::ref_ptr<osg::Group>    g        = new osg::Group;
     osg::ref_ptr<osg::StateSet> stateset = g->getOrCreateStateSet();
@@ -711,6 +711,10 @@ ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
   stateset->addUniform(new osg::Uniform("sceneTex", 0));
   stateset->addUniform(new osg::Uniform("bufferA", 1));
   stateset->addUniform(new osg::Uniform("bufferB", 2));
+  stateset->addUniform(
+    new osg::Uniform("fogColor", osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f)));
+  stateset->addUniform(new osg::Uniform("density", 5.0f));
+  stateset->addUniform(new osg::Uniform("doSquared", 0));
   root->addChild(rttCamera);
 }
 
@@ -1498,7 +1502,8 @@ main(int // argc
   double previousTime = viewer.getFrameStamp()->getSimulationTime();
   while (!viewer.done()) {
     viewer.frame();
-    //SOLEIL__LOGGER_DEBUG("FRAME! ", viewer.getFrameStamp()->getFrameNumber());
+    // SOLEIL__LOGGER_DEBUG("FRAME! ",
+    // viewer.getFrameStamp()->getFrameNumber());
 
     // Update events
     double deltaTime =
