@@ -24,6 +24,7 @@
 #include "Logger.h"
 #include <osg/Program>
 #include <osg/Shader>
+#include <osgDB/ReadFile>
 
 namespace Soleil {
 
@@ -34,30 +35,28 @@ namespace Soleil {
                                    "gl_Position = ftransform();\n"
                                    "gl_TexCoord[0] = gl_MultiTexCoord0;\n"
                                    "}\n"};
-  static const char* fragSource = {
-    "uniform sampler2D sceneTex;\n"
-    "uniform sampler2D bufferA;\n"
-    "uniform sampler2D bufferB;\n"
-    "void main(void)\n"
-    "{\n"
-    // Get noise value from texture, changing by frame time
-    // "float factor = osg_FrameTime * 100.0;\n"
-    // "vec2 uv = vec2(0.4*sin(factor), 0.4*cos(factor));\n"
-    // "vec3 n = texture2D(noiseTex, (gl_TexCoord[0].st*3.5) + uv).rgb;\n"
-    "float alpha = texture2D(bufferA, gl_TexCoord[0].st).r - "
-    "texture2D(bufferB, gl_TexCoord[0].st).r;"
-    "if (alpha < 0.0) alpha = 0.0;" // TODO:
-    // Get scene and compute greyscale intensity
-    "vec4 c = mix(texture2D(sceneTex, gl_TexCoord[0].st), vec4(0.776, "
-    "0.839, 0.851, 1.0), alpha); \n "
-    "gl_FragColor = c;\n"
-    "}\n"};
+  // static const char* fragSource = {
+  //   "uniform sampler2D sceneTex;\n"
+  //   "uniform sampler2D bufferA;\n"
+  //   "uniform sampler2D bufferB;\n"
+  //   "vec4 fogColor = vec4(0.776, 0.839, 0.851, 1.0);\n"
+  //   "void main(void)\n"
+  //   "{\n"
+  //   "float alpha = texture2D(bufferA, gl_TexCoord[0].st).r - "
+  //   "texture2D(bufferB, gl_TexCoord[0].st).r;"
+  //   "if (alpha < 0.0) alpha = 0.0;" // TODO:
+  //   // Get scene and compute greyscale intensity
+  //   "vec4 c = mix(texture2D(sceneTex, gl_TexCoord[0].st), fogColor, alpha); \n "
+  //   "gl_FragColor = c;\n"
+  //   "}\n"};
 
   osg::ref_ptr<osg::Program> CreateVolumetricFogProgram()
   {
+    auto frag = osgDB::readShaderFile("../media/shaders/volumetricFog.frag");
     osg::ref_ptr<osg::Program> program = new osg::Program;
     program->addShader(new osg::Shader(osg::Shader::VERTEX, vertSource));
-    program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
+    //program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
+    program->addShader(frag);
     return program;
   }
 
