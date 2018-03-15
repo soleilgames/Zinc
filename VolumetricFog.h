@@ -23,6 +23,7 @@
 #define SOLEIL__VOLUMETRICFOG_H_
 
 #include <functional>
+#include <osg/Camera>
 #include <osg/Drawable>
 #include <osg/Program>
 #include <osg/Texture2D>
@@ -50,6 +51,19 @@ namespace Soleil {
 
     CopyTextureOnCondition(Condition                    condition,
                            osg::ref_ptr<osg::Texture2D> texture);
+  };
+
+  class ClearScreenOnCondition : public osg::Camera::DrawCallback
+  {
+  public:
+    typedef std::function<bool(const osg::Vec3& eye)> Condition;
+
+  public:
+    ClearScreenOnCondition(Condition condition);
+    void operator()(osg::RenderInfo& renderInfo) const override;
+
+  private:
+    Condition condition;
   };
 
 } // Soleil

@@ -71,23 +71,60 @@ namespace Soleil {
   void CopyTextureOnCondition::CopyCallBack::drawImplementation(
     osg::RenderInfo& renderInfo, const osg::Drawable*) const
   {
+    // TODO: Just get Trans
     osg::Vec3d eye;
     osg::Vec3d center;
     osg::Vec3d up;
     renderInfo.getView()->getCamera()->getViewMatrixAsLookAt(eye, center, up);
-    SOLEIL__LOGGER_DEBUG("Camera position: ", eye);
+    // SOLEIL__LOGGER_DEBUG("Camera position: ", eye);
 
-    if (condition(eye)) {
+    if (condition(eye) /*Camera is not in fog*/) {
       texture->copyTexImage2D(*renderInfo.getState(), 0, 0,
                               texture->getTextureWidth(),
                               texture->getTextureHeight());
-    }
+    } // else {
+    //   // texture->getC
+    //   texture->apply(*renderInfo.getState());
+    //   //GLuint clearColor[4] = {0, 0, 0, 0};
+    //   // glClearTexImage(GL_TEXTURE_2D, 0, GL_BGRA, GL_UNSIGNED_BYTE,
+    //   // &clearColor);
+    // }
   }
 
   CopyTextureOnCondition::CopyTextureOnCondition(
     Condition condition, osg::ref_ptr<osg::Texture2D> texture)
   {
     this->setDrawCallback(new CopyCallBack(condition, texture));
+  }
+
+  ClearScreenOnCondition::ClearScreenOnCondition(Condition condition)
+    : condition(condition)
+  {
+  }
+
+  void ClearScreenOnCondition::operator()(osg::RenderInfo& renderInfo) const
+  {
+    // TODO: Just get Trans
+    osg::Vec3d eye;
+    osg::Vec3d center;
+    osg::Vec3d up;
+    renderInfo.getView()->getCamera()->getViewMatrixAsLookAt(eye, center, up);
+
+    if (condition(eye) /*Camera is not in fog*/) {
+      // Keep the copied texture
+      renderInfo.getCurrentCamera()->setClearMask(0);
+    } else {
+      // Camera is in the fog, clear texture
+      renderInfo.getCurrentCamera()->setClearColor(
+        osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
+      renderInfo.getCurrentCamera()->setClearDepth(0.0f);
+      renderInfo.getCurrentCamera()->setClearMask(GL_COLOR_BUFFER_BIT |
+                                                  GL_DEPTH_BUFFER_BIT);
+      // renderInfo.getCurrentCamera()->getGraphicsContext()->clear();
+      // renderInfo.getState()->getGraphicsContext()->clear();
+      // SOLEIL__LOGGER_DEBUG("CLEAR");
+      // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
   }
 
 } // Soleil
