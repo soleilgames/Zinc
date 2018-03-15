@@ -101,6 +101,19 @@ target_link_libraries(steering
   )
 
 
+add_executable(volumetricfog
+  test/volumetricfog.cpp
+
+  ${ZINC_ENGINE_SRC}
+  )
+target_include_directories(volumetricfog PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_link_libraries(volumetricfog
+  ${OPENSCENEGRAPH_LIBRARIES}
+  )
+
+
+
 # add_executable(clouds
 #   test/clouds.cpp
 

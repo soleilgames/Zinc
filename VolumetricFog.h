@@ -27,6 +27,7 @@
 #include <osg/Drawable>
 #include <osg/Program>
 #include <osg/Texture2D>
+#include <osgViewer/Viewer>
 
 namespace Soleil {
 
@@ -65,6 +66,11 @@ namespace Soleil {
   private:
     Condition condition;
   };
+
+  void ApplyVolumetricFog(osgViewer::Viewer&       viewer,
+                          osg::ref_ptr<osg::Group> root,
+                          osg::ref_ptr<osg::Node>  scene,
+                          osg::ref_ptr<osg::Node>  fogModel);
 
 } // Soleil
 
