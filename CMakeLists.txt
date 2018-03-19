@@ -10,7 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(OpenSceneGraph REQUIRED osgDB osgUtil osgViewer osgGA osgParticle osgAnimation) # NO_CMAKE_PATH # osgDB osgUtil
 
 # Used by cloud example:
-# find_package(OpenGL REQUIRED)
+find_package(OpenGL REQUIRED)
 # find_package(GLUT REQUIRED)
 
 
@@ -55,6 +55,7 @@ find_package(OpenSceneGraph REQUIRED osgDB osgUtil osgViewer osgGA osgParticle o
 
 include_directories(
   ${OPENSCENEGRAPH_INCLUDE_DIRS}
+  imgui/
 
   ${OPENGL_INCLUDE_DIRS}  ${GLUT_INCLUDE_DIRS}
   )
@@ -73,6 +74,11 @@ SET(ZINC_ENGINE_SRC
   AlienCraft.cpp
   ParticleObjects.cpp
   VolumetricFog.cpp
+
+  ImGuiHandler.cpp
+  imgui/imgui.cpp
+  imgui/imgui_draw.cpp
+  imgui/imgui_demo.cpp
   #CloudBlock.cpp
   )
 
@@ -85,6 +91,7 @@ add_executable(zinc-osg
 
 target_link_libraries(zinc-osg
   ${OPENSCENEGRAPH_LIBRARIES}
+  ${OPENGL_LIBRARIES}
   )
 
 
@@ -98,6 +105,7 @@ target_include_directories(steering PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(steering
   ${OPENSCENEGRAPH_LIBRARIES}
+  ${OPENGL_LIBRARIES}
   )
 
 
@@ -110,6 +118,7 @@ target_include_directories(volumetricfog PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(volumetricfog
   ${OPENSCENEGRAPH_LIBRARIES}
+  ${OPENGL_LIBRARIES}
   )
 
 

@@ -22,12 +22,12 @@
 #include "VolumetricFog.h"
 
 #include "Logger.h"
-#include <osg/Program>
-#include <osg/Shader>
-#include <osgDB/ReadFile>
 #include "SceneManager.h"
 #include "Utils.h"
 #include <osg/CullFace>
+#include <osg/Program>
+#include <osg/Shader>
+#include <osgDB/ReadFile>
 #include <osgUtil/DelaunayTriangulator>
 
 namespace Soleil {
@@ -131,10 +131,10 @@ namespace Soleil {
     }
   }
 
-  void ApplyVolumetricFog(osgViewer::Viewer& viewer,
-			  osg::ref_ptr<osg::Group> root,
+  void ApplyVolumetricFog(osgViewer::Viewer&       viewer,
+                          osg::ref_ptr<osg::Group> root,
                           osg::ref_ptr<osg::Node>  scene,
-			  osg::ref_ptr<osg::Node> fogModel)
+                          osg::ref_ptr<osg::Node>  fogModel)
   {
     // // MUST: Be rendered after the scene
     // osg::ref_ptr<osg::Texture2D> sceneBuffer = new osg::Texture2D;
@@ -146,14 +146,14 @@ namespace Soleil {
     // tex2D);
     // root->addChild(drawable);
     assert(viewer.getCamera() && viewer.getCamera()->getViewport());
-    const float width = viewer.getCamera()->getViewport()->width();
+    const float width  = viewer.getCamera()->getViewport()->width();
     const float height = viewer.getCamera()->getViewport()->height();
 
     osg::ref_ptr<osg::Camera> hudCamera =
       Soleil::createHUDCamera(0.0, 1.0, 0.0, 1.0);
     root->addChild(hudCamera);
     hudCamera->setNodeMask(Soleil::SceneManager::Mask::Render);
-    hudCamera->setClearColor(viewer.getCamera()->getClearColor());
+    // hudCamera->setClearColor(viewer.getCamera()->getClearColor());
 
     // Render the scene into an off-screen buffer A, encoding each pixel's w
     // depth
@@ -291,28 +291,32 @@ namespace Soleil {
     // on
     // a fog mask.
     osg::ref_ptr<osg::Texture2D> sceneBuffer = new osg::Texture2D;
-    sceneBuffer->setTextureSize(width, height); // TODO: Real Size
+    sceneBuffer->setTextureSize(width, height);
     sceneBuffer->setInternalFormat(GL_RGBA);
     osg::ref_ptr<osg::Camera> rttCamera =
       Soleil::createRTTCamera(osg::Camera::COLOR_BUFFER, sceneBuffer);
-    rttCamera->setClearColor(viewer.getCamera()->getClearColor());
+    // TODO: So that I can render thing below it
+    // rttCamera->setClearColor(viewer.getCamera()->getClearColor());
+    rttCamera->setClearColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
     rttCamera->addChild(scene);
-    // rttCamera->setAllowEventFocus(true);
+    root->addChild(rttCamera);
+
     auto quad = Soleil::createScreenQuad(1.0f, 1.0f);
+    quad->setName("FogSceneResult");
     hudCamera->addChild(quad);
     osg::StateSet* stateset = quad->getOrCreateStateSet();
-    stateset->setTextureAttributeAndModes(0, sceneBuffer);
-    stateset->setTextureAttributeAndModes(1, tex2D);
-    stateset->setTextureAttributeAndModes(2, bufferB);
-    stateset->setAttributeAndModes(Soleil::CreateVolumetricFogProgram());
+    stateset->setTextureAttribute(0, sceneBuffer);
+    stateset->setTextureAttribute(1, tex2D);
+    stateset->setTextureAttribute(2, bufferB);
+    stateset->setAttribute(Soleil::CreateVolumetricFogProgram());
     stateset->addUniform(new osg::Uniform("sceneTex", 0));
     stateset->addUniform(new osg::Uniform("bufferA", 1));
     stateset->addUniform(new osg::Uniform("bufferB", 2));
-    stateset->addUniform(
-      new osg::Uniform("fogColor", osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f)));
-    stateset->addUniform(new osg::Uniform("density", 5.0f));
-    stateset->addUniform(new osg::Uniform("doSquared", 0));
-    root->addChild(rttCamera);
+    // TODO: Removed for the video (added to root)
+    // stateset->addUniform(
+    //   new osg::Uniform("fogColor", osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f)));
+    // stateset->addUniform(new osg::Uniform("density", 5.0f));
+    // stateset->addUniform(new osg::Uniform("doSquared", 0));
   }
 
 } // Soleil
