@@ -354,8 +354,7 @@ PlayerFlightCameraManipulator::handle(const osgGA::GUIEventAdapter& event,
   const osg::Vec3 nextPosition    = translate;
   osg::Vec3       collisionNormal;
 
-  if (false && // TODO:
-      Soleil::SceneManager::SegmentCollision(currentPosition, nextPosition,
+  if (Soleil::SceneManager::SegmentCollision(currentPosition, nextPosition,
                                              PlayerNode, &collisionNormal)) {
     // TODO: Seperate Object destruction and object touched Events
     PlayerNode->lifePoints = 0;
@@ -546,179 +545,6 @@ convertImageListTo3Dstate(std::vector<std::string> files)
 }
 
 /* --- Create texture 3D from a list of texture 2D --- */
-
-/* --- Volumetric Fog --- */
-
-static void
-ApplyDepthCamera(osg::ref_ptr<osg::Group> root, osg::ref_ptr<osg::Node> scene)
-{
-  // // MUST: Be rendered after the scene
-  // osg::ref_ptr<osg::Texture2D> sceneBuffer = new osg::Texture2D;
-  // sceneBuffer->setTextureSize(1024, 1024); // TODO: Real Size
-  // sceneBuffer->setInternalFormat(GL_RGBA);
-  // auto drawable = new Soleil::CopyTextureOnCondition(
-  //   [](const osg::Vec3& /*eye*/) { return true; }, sceneBuffer);
-  // // drawable->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
-  // root->addChild(drawable);
-
-  osg::ref_ptr<osg::Camera> hudCamera =
-    Soleil::createHUDCamera(0.0, 1.0, 0.0, 1.0);
-  root->addChild(hudCamera);
-  hudCamera->setNodeMask(Soleil::SceneManager::Mask::Render);
-
-  // Render the scene into an off-screen buffer A, encoding each pixel's w depth
-  // as its alpha value- Z Buffering enabled.
-  osg::ref_ptr<osg::Texture2D> tex2D = new osg::Texture2D;
-  osg::ref_ptr<osg::Camera>    rttCameraFront;
-  {
-    tex2D->setTextureSize(1024, 1024);
-    tex2D->setInternalFormat(GL_DEPTH_COMPONENT24);
-    tex2D->setSourceFormat(GL_DEPTH_COMPONENT);
-    tex2D->setSourceType(GL_FLOAT);
-
-    rttCameraFront = Soleil::createRTTCamera(osg::Camera::DEPTH_BUFFER, tex2D);
-    rttCameraFront->addChild(scene);
-
-    auto quad = Soleil::createScreenQuad(.10f, .10f);
-    hudCamera->addChild(quad);
-    quad->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
-
-    root->addChild(rttCameraFront);
-  }
-
-  // Render the backside of the fog into off-screen buffer A, encoding each
-  // pixel's w depth.
-  osg::ref_ptr<osg::Node> fogModel =
-    osgDB::readNodeFile("../media/ZincFog.osgt");
-  osg::ref_ptr<osg::Camera> rttCameraFogBack;
-  {
-    rttCameraFogBack =
-      Soleil::createRTTCamera(osg::Camera::DEPTH_BUFFER, tex2D);
-    rttCameraFogBack->setClearMask(0);
-    // cull front faces
-    osg::ref_ptr<osg::Group>    g        = new osg::Group;
-    osg::ref_ptr<osg::StateSet> stateset = g->getOrCreateStateSet();
-    osg::CullFace* cullFace = new osg::CullFace(osg::CullFace::Mode::FRONT);
-    stateset->setAttributeAndModes(cullFace,
-                                   osg::StateAttribute::ON |
-                                     osg::StateAttribute::OVERRIDE |
-                                     osg::StateAttribute::PROTECTED);
-
-    g->addChild(fogModel);
-    rttCameraFogBack->addChild(g);
-    // auto quad =
-    //   Soleil::createScreenQuad(.10f, .10f, osg::Vec3(0.0f, 0.1f, 0.0f));
-    // hudCamera->addChild(quad);
-    // quad->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
-
-    root->addChild(rttCameraFogBack);
-    // root->addChild(g);
-  }
-
-  // If the camera is not inside fog, render the scene into an off-screen buffer
-  // B (or copy it from buffer A before step 2 takes place), using the w depth
-  // alpha encoding. Otherwise, skip this step.
-  osg::ref_ptr<osg::Texture2D> bufferB = new osg::Texture2D;
-  //{
-  bufferB->setTextureSize(1024, 1024);
-  bufferB->setInternalFormat(GL_DEPTH_COMPONENT24);
-  bufferB->setSourceFormat(GL_DEPTH_COMPONENT);
-  bufferB->setSourceType(GL_FLOAT);
-
-#if 0
-    osg::ref_ptr<osg::Camera>    rttCameraFrontAgain;
-    rttCameraFrontAgain =
-      Soleil::createRTTCamera(osg::Camera::DEPTH_BUFFER, bufferB);
-    rttCameraFrontAgain->addChild(scene);
-    // auto quad =
-    //   Soleil::createScreenQuad(1.0f, 1.0f);
-    // rttCameraFrontAgain->addChild(quad);
-
-    //If used camera has to render only if the main camera is not inside the fog
-    //root->addChild(rttCameraFrontAgain);
-#elif 1
-  osg::ref_ptr<osg::Geometry> cube =
-    Soleil::GetNodeByName(*fogModel, "Cube_0")->asGeometry();
-  assert(cube);
-  osg::Vec3Array* points =
-    dynamic_cast<osg::Vec3Array*>(cube->getVertexArray());
-  assert(points);
-
-  osg::ref_ptr<osgUtil::DelaunayConstraint> c = new osgUtil::DelaunayConstraint;
-  c->getPoints(points);
-
-  auto box = cube->computeBoundingBox();
-
-  auto isNotInsideFog = [fogModel, c, box](const osg::Vec3& eye) {
-    // return fogModel->getBound().contains(eye) == false;
-    // return c->contains(eye) == false;
-    return box.contains(eye) == false;
-    // TODO: HULL
-  };
-
-  auto copyTexture =
-    new Soleil::CopyTextureOnCondition(isNotInsideFog, bufferB);
-  copyTexture->getOrCreateStateSet()->setTextureAttributeAndModes(0, tex2D);
-  rttCameraFogBack->addChild(copyTexture);
-#endif
-  //}
-
-  // Render the front side of the fog volume into off-screen buffer B with w
-  // alpha encoding. Since the fog volume should be in front of parts of the
-  // object that are obscured by fog, it will replace them at those pixels.
-  osg::ref_ptr<osg::Camera> rttCameraFogFront;
-  {
-    rttCameraFogFront =
-      Soleil::createRTTCamera(osg::Camera::DEPTH_BUFFER, bufferB);
-    rttCameraFogFront->setClearMask(0);
-    rttCameraFogFront->setPreDrawCallback(
-      new Soleil::ClearScreenOnCondition(isNotInsideFog));
-    // cull front faces
-    osg::ref_ptr<osg::Group>    g        = new osg::Group;
-    osg::ref_ptr<osg::StateSet> stateset = g->getOrCreateStateSet();
-    osg::CullFace* cullFace = new osg::CullFace(osg::CullFace::Mode::BACK);
-    stateset->setAttributeAndModes(cullFace,
-                                   osg::StateAttribute::ON |
-                                     osg::StateAttribute::OVERRIDE |
-                                     osg::StateAttribute::PROTECTED);
-
-    g->addChild(fogModel);
-    rttCameraFogFront->addChild(g);
-    auto quad =
-      Soleil::createScreenQuad(.10f, .10f, osg::Vec3(0.0f, 0.1f, 0.0f));
-    hudCamera->addChild(quad);
-    quad->getOrCreateStateSet()->setTextureAttributeAndModes(0, bufferB);
-
-    root->addChild(rttCameraFogFront);
-  }
-
-  // Subtract the two buffers in screen space using the alpha value to blend on
-  // a fog mask.
-  osg::ref_ptr<osg::Texture2D> sceneBuffer = new osg::Texture2D;
-  sceneBuffer->setTextureSize(1024, 1024); // TODO: Real Size
-  sceneBuffer->setInternalFormat(GL_RGBA);
-  osg::ref_ptr<osg::Camera> rttCamera =
-    Soleil::createRTTCamera(osg::Camera::COLOR_BUFFER, sceneBuffer);
-  rttCamera->addChild(scene);
-  // rttCamera->setAllowEventFocus(true);
-  auto quad = Soleil::createScreenQuad(1.0f, 1.0f);
-  hudCamera->addChild(quad);
-  osg::StateSet* stateset = quad->getOrCreateStateSet();
-  stateset->setTextureAttributeAndModes(0, sceneBuffer);
-  stateset->setTextureAttributeAndModes(1, tex2D);
-  stateset->setTextureAttributeAndModes(2, bufferB);
-  stateset->setAttributeAndModes(Soleil::CreateVolumetricFogProgram());
-  stateset->addUniform(new osg::Uniform("sceneTex", 0));
-  stateset->addUniform(new osg::Uniform("bufferA", 1));
-  stateset->addUniform(new osg::Uniform("bufferB", 2));
-  stateset->addUniform(
-    new osg::Uniform("fogColor", osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f)));
-  stateset->addUniform(new osg::Uniform("density", 5.0f));
-  stateset->addUniform(new osg::Uniform("doSquared", 0));
-  root->addChild(rttCamera);
-}
-
-/* --- Volumetric Fog --- */
 
 /* --- Explosion Impostor --- */
 
@@ -1083,23 +909,23 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   skybox->addChild(fogModel);
   //root->addChild(fogModel);
 #elif 1
-  osg::ref_ptr<osg::Node> fogModel =
-    osgDB::readNodeFile("../media/ZincFogSurface.osgt");
-  fogModel->getOrCreateStateSet()->setRenderingHint(
-    osg::StateSet::TRANSPARENT_BIN);
-  fogModel->getOrCreateStateSet()->setMode(GL_LIGHTING,
-                                           osg::StateAttribute::OFF);
+  // osg::ref_ptr<osg::Node> fogModel =
+  //   osgDB::readNodeFile("../media/ZincFogSurface.osgt");
+  // fogModel->getOrCreateStateSet()->setRenderingHint(
+  //   osg::StateSet::TRANSPARENT_BIN);
+  // fogModel->getOrCreateStateSet()->setMode(GL_LIGHTING,
+  //                                          osg::StateAttribute::OFF);
   // osg::ref_ptr<osg::StateAttribute> blend =
   //   new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
   //                      osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
   // stateset->setAttributeAndModes(blend, osg::StateAttribute::ON);
-  {
-    auto mask = fogModel->getNodeMask();
-    mask &= ~Soleil::SceneManager::Mask::Collision;
-    mask &= ~Soleil::SceneManager::Mask::Shootable;
-    // TODO: fogModel->setNodeMask(mask);
-    fogModel->setNodeMask(0);
-  }
+  // {
+  //   auto mask = fogModel->getNodeMask();
+  //   mask &= ~Soleil::SceneManager::Mask::Collision;
+  //   mask &= ~Soleil::SceneManager::Mask::Shootable;
+  //   // TODO: fogModel->setNodeMask(mask);
+  //   fogModel->setNodeMask(0);
+  // }
   // root->addChild(fogModel);
 
   // Add fog
@@ -1436,8 +1262,18 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   osg::ref_ptr<osg::Camera> hud = CreateHUDCamera();
   root->addChild(hud);
 
-  ApplyDepthCamera(superRoot, root); // TODO: Clear super root
-  // ApplyDepthCamera(root, model);
+  osg::ref_ptr<osg::Node> fogModel =
+    osgDB::readNodeFile("../media/ZincVolumeFogTest.osgt"); // ../media/ZincFog.osgt
+  fogModel->getOrCreateStateSet()->setMode(GL_LIGHTING,
+                                           osg::StateAttribute::OFF);
+  // {
+  //   auto mask = fogModel->getNodeMask();
+  //   mask &= ~Soleil::SceneManager::Mask::Collision;
+  //   mask &= ~Soleil::SceneManager::Mask::Shootable;
+  //   fogModel->setNodeMask(mask);
+  // }
+  Soleil::ApplyVolumetricFog(viewer, superRoot, root, fogModel);
+  // TODO: Clear super root
 
   SOLEIL__LOGGER_DEBUG("New level loaded");
 }
@@ -1455,6 +1291,17 @@ main(int // argc
   // superRoot->addChild(root);
   osgViewer::Viewer viewer;
   viewer.setLightingMode(osg::View::SKY_LIGHT);
+
+  // SingleThreaded
+  // CullDrawThreadPerContext
+  // ThreadPerContext
+  // DrawThreadPerContext
+  // CullThreadPerCameraDrawThreadPerContext
+  // ThreadPerCamera
+  // AutomaticSelection
+  viewer.setThreadingModel(
+    osgViewer::ViewerBase::ThreadingModel::SingleThreaded);
+  viewer.realize();
 
 #if 0
   viewer.getCamera()->setComputeNearFarMode(
@@ -1485,17 +1332,6 @@ main(int // argc
   viewer.addEventHandler(new osgViewer::StatsHandler());
   // viewer.setSceneData(root);
   viewer.setSceneData(superRoot);
-
-  // SingleThreaded
-  // CullDrawThreadPerContext
-  // ThreadPerContext
-  // DrawThreadPerContext
-  // CullThreadPerCameraDrawThreadPerContext
-  // ThreadPerCamera
-  // AutomaticSelection
-  viewer.setThreadingModel(
-    osgViewer::ViewerBase::ThreadingModel::SingleThreaded);
-  viewer.realize();
 
   Soleil::EventManager::Emit(std::make_shared<Soleil::EventLoadLevel>("first"));
 

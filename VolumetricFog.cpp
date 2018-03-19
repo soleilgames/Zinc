@@ -312,11 +312,10 @@ namespace Soleil {
     stateset->addUniform(new osg::Uniform("sceneTex", 0));
     stateset->addUniform(new osg::Uniform("bufferA", 1));
     stateset->addUniform(new osg::Uniform("bufferB", 2));
-    // TODO: Removed for the video (added to root)
-    // stateset->addUniform(
-    //   new osg::Uniform("fogColor", osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f)));
-    // stateset->addUniform(new osg::Uniform("density", 5.0f));
-    // stateset->addUniform(new osg::Uniform("doSquared", 0));
+    stateset->addUniform(
+      new osg::Uniform("fogColor", osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f)));
+    stateset->addUniform(new osg::Uniform("density", 5.0f));
+    stateset->addUniform(new osg::Uniform("doSquared", 0));
   }
 
 } // Soleil

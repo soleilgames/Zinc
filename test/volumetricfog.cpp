@@ -181,7 +181,8 @@ main(int // argc
   // n->getStateSet()
   //   ->getUniform("doSquared")
   //   ->setUpdateCallback(new UniCallBack<bool>(fogDoSquared));
-
+  // TODO: Uniform has to be removed from the node and added to root in order to
+  // have the UniformCallback in action
   {
     osg::ref_ptr<osg::Uniform> u = new osg::Uniform("fogColor", osg::Vec4());
     u->setUpdateCallback(new UniCallBack<osg::Vec4>(fogColor));
