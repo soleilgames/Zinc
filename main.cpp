@@ -91,7 +91,7 @@ Soleil::EventManager        SystemEventManager;
 
 // TODO: Not here:
 osg::ref_ptr<osg::Geometry> hudPlaneLife;
-osg::ref_ptr<osg::Group>    superRoot; // TODO: temp
+osg::ref_ptr<osg::Group>    ROOT;
 
 class DrawableStateCallback : public osg::Drawable::UpdateCallback
 {
@@ -840,7 +840,7 @@ CreateHUDCamera()
 }
 
 void
-FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
+FirstLevelSetup(osg::ref_ptr<osg::Group> scene, osgViewer::Viewer& viewer)
 {
   SOLEIL__LOGGER_DEBUG("Loading new level...");
   Soleil::EventManager::Init();
@@ -849,12 +849,12 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup = new Soleil::EntityGroup;
   playerEntityGroup->addChild(plane);
   playerEntityGroup->setName("PlayerEntityGroup");
-  root->addChild(playerEntityGroup);
+  scene->addChild(playerEntityGroup);
 
   ///////////////////////
   // Setting the Scene //
   ///////////////////////
-  // Soleil::SceneManager::Init(root);
+  // Soleil::SceneManager::Init(scene);
   osg::ref_ptr<osg::Node> skycube =
     osgDB::readNodeFile("../media/ZincSkybox.osgt");
   assert(skycube);
@@ -866,9 +866,9 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 
   skybox->setNodeMask(mask);
   skycube->setNodeMask(mask);
-  root->addChild(skybox);
+  scene->addChild(skybox);
 
-  // root->addChild(createAxisPath(10));
+  // scene->addChild(createAxisPath(10));
 
   osg::ref_ptr<osg::Group> model =
     osgDB::readNodeFile("../media/islands.3ds.osgt")->asGroup();
@@ -876,7 +876,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   model->setNodeMask(model->getNodeMask() &
                      ~Soleil::SceneManager::Mask::Shootable);
   model->setName("Level");
-  root->addChild(model);
+  scene->addChild(model);
 
 // Fog:
 #if 0
@@ -898,8 +898,8 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   fog->setColor(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
   // fogModel->getOrCreateStateSet()->setAttributeAndModes(fog);
   // fogModel->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
-  root->getOrCreateStateSet()->setAttributeAndModes(fog);
-  root->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
+  scene->getOrCreateStateSet()->setAttributeAndModes(fog);
+  scene->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
 
   osg::ref_ptr<osg::Geometry> cube =
     Soleil::GetNodeByName(*fogModel, "Cube_0")->asGeometry();
@@ -907,7 +907,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   cube->setFogCoordArray(cube->getVertexArray());
 
   skybox->addChild(fogModel);
-  //root->addChild(fogModel);
+  //scene->addChild(fogModel);
 #elif 1
   // osg::ref_ptr<osg::Node> fogModel =
   //   osgDB::readNodeFile("../media/ZincFogSurface.osgt");
@@ -926,7 +926,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   //   // TODO: fogModel->setNodeMask(mask);
   //   fogModel->setNodeMask(0);
   // }
-  // root->addChild(fogModel);
+  // scene->addChild(fogModel);
 
   // Add fog
   osg::ref_ptr<osg::Fog> fog = new osg::Fog;
@@ -937,13 +937,13 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   // fog->setFogCoordinateSource(GL_FOG_COORD);
   fog->setFogCoordinateSource(osg::Fog::FogCoordinateSource::FRAGMENT_DEPTH);
   fog->setColor(osg::Vec4(0.776f, 0.839f, 0.851f, 1.0f));
-  root->getOrCreateStateSet()->setAttributeAndModes(fog);
-  root->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
-  root->addUpdateCallback(new FogStateCallback(fog));
+  scene->getOrCreateStateSet()->setAttributeAndModes(fog);
+  scene->getOrCreateStateSet()->setMode(GL_FOG, osg::StateAttribute::ON);
+  scene->addUpdateCallback(new FogStateCallback(fog));
 
   // Particles Floor: -------------------------------------
   {
-    osg::Group& parent = *root;
+    osg::Group& parent = *scene;
     // osg::Group&                               parent = *skybox;
     constexpr float                           scale = 100.0f;
     osg::ref_ptr<osgParticle::ParticleSystem> ps =
@@ -1011,7 +1011,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
 #endif
 
   // Soleil::SceneManager::Init(model);
-  Soleil::SceneManager::Init(root);
+  Soleil::SceneManager::Init(scene);
 
   /////////////////////////////
   // ----------------------- //
@@ -1056,7 +1056,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   }
 
   // explosion->setUpdateCallback(new UpdateStateCallback(ex->getStateSet()));
-  root->addChild(explosion);
+  scene->addChild(explosion);
 
   // Configure Shoot tracer geode
   {
@@ -1076,17 +1076,17 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
       tracerUpdater->tracers.push_back(tracer);
     }
 
-    root->addChild(shootTracers);
+    scene->addChild(shootTracers);
   }
 
   // --------------------------------------------
   // Particle Emitter
   /* --- Explosion with particles --- */
-  osg::ref_ptr<osgParticle::ParticleSystem> ps = CreateExplosionPS(*root);
+  osg::ref_ptr<osgParticle::ParticleSystem> ps = CreateExplosionPS(*scene);
   Soleil::SceneManager::RegisterParticleSystem(0, ps);
 
   Soleil::EventManager::Enroll(
-    Soleil::EventDestructObject::Type(), [root](Soleil::Event& e) {
+    Soleil::EventDestructObject::Type(), [scene](Soleil::Event& e) {
       Soleil::EventDestructObject* event =
         static_cast<Soleil::EventDestructObject*>(&e);
 
@@ -1147,7 +1147,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   // Alien Shoot particles //
   ///////////////////////////
   osg::ref_ptr<osgParticle::ParticleSystem> alienShootPS =
-    CreateAlienShootPS(*root);
+    CreateAlienShootPS(*scene);
   Soleil::SceneManager::RegisterParticleSystem(3, alienShootPS);
   Soleil::SceneManager::AddParticleEmitter(
     3, Soleil::ShootEmitter::CreateAlienShootEmitter());
@@ -1234,7 +1234,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
     }
   };
 
-  root->addChild(ennemies);
+  scene->addChild(ennemies);
 
   // Add some test Ballon ------------------------
   osg::ref_ptr<osg::Node> templateBalloon =
@@ -1254,16 +1254,16 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   }
 
   // Set the cannonical nodes path --------------------
-  assert(Soleil::GetPathByNodeName(*root, "Player").empty() == false);
+  assert(Soleil::GetPathByNodeName(*scene, "Player").empty() == false);
   Soleil::SceneManager::RegisterNodePath(
-    Soleil::ConstHash("Player"), Soleil::GetPathByNodeName(*root, "Player"));
+    Soleil::ConstHash("Player"), Soleil::GetPathByNodeName(*scene, "Player"));
 
   // HUD Camera ---------------------------------------
   osg::ref_ptr<osg::Camera> hud = CreateHUDCamera();
-  root->addChild(hud);
+  scene->addChild(hud);
 
-  osg::ref_ptr<osg::Node> fogModel =
-    osgDB::readNodeFile("../media/ZincVolumeFogTest.osgt"); // ../media/ZincFog.osgt
+  osg::ref_ptr<osg::Node> fogModel = osgDB::readNodeFile(
+    "../media/ZincVolumeFogTest.osgt"); // ../media/ZincFog.osgt
   fogModel->getOrCreateStateSet()->setMode(GL_LIGHTING,
                                            osg::StateAttribute::OFF);
   // {
@@ -1272,7 +1272,7 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> root, osgViewer::Viewer& viewer)
   //   mask &= ~Soleil::SceneManager::Mask::Shootable;
   //   fogModel->setNodeMask(mask);
   // }
-  Soleil::ApplyVolumetricFog(viewer, superRoot, root, fogModel);
+  Soleil::ApplyVolumetricFog(viewer, ROOT, scene, fogModel);
   // TODO: Clear super root
 
   SOLEIL__LOGGER_DEBUG("New level loaded");
@@ -1284,11 +1284,11 @@ main(int // argc
      char* const // argv
        [])
 {
-  osg::ref_ptr<osg::Group> root = new osg::Group();
-  root->setName("ROOT");
-  superRoot = new osg::Group(); // TODO: Clean and rename
-  superRoot->setName("SUPER ROOT");
-  // superRoot->addChild(root);
+  osg::ref_ptr<osg::Group> scene = new osg::Group();
+  scene->setName("SCENE");
+  ROOT = new osg::Group(); // TODO: Clean and rename
+  ROOT->setName("SUPER ROOT");
+  // ROOT->addChild(root);
   osgViewer::Viewer viewer;
   viewer.setLightingMode(osg::View::SKY_LIGHT);
 
@@ -1316,22 +1316,22 @@ main(int // argc
 #endif
 
   SystemEventManager.enroll(Soleil::EventLoadLevel::Type(),
-                            [root, &viewer](Soleil::Event& /*e*/) {
+                            [scene, &viewer](Soleil::Event& /*e*/) {
                               // Soleil::EventLoadLevel* event =
                               // static_cast<Soleil::EventLoadLevel*>(&e);
 
                               SOLEIL__LOGGER_DEBUG("Need to load a new level");
-                              root->removeChildren(0, root->getNumChildren());
-                              FirstLevelSetup(root, viewer);
+                              scene->removeChildren(0, scene->getNumChildren());
+                              FirstLevelSetup(scene, viewer);
                             });
 
-  FirstLevelSetup(root, viewer);
+  FirstLevelSetup(scene, viewer);
 
   // --------------------------------------------
   // Attach the scene
   viewer.addEventHandler(new osgViewer::StatsHandler());
-  // viewer.setSceneData(root);
-  viewer.setSceneData(superRoot);
+  // viewer.setSceneData(scene);
+  viewer.setSceneData(ROOT);
 
   Soleil::EventManager::Emit(std::make_shared<Soleil::EventLoadLevel>("first"));
 
