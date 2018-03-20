@@ -123,6 +123,24 @@ target_link_libraries(volumetricfog
 
 
 
+add_executable(infinity
+  test/infinity.cpp
+
+  ${ZINC_ENGINE_SRC}
+  )
+target_include_directories(infinity PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_link_libraries(infinity
+  ${OPENSCENEGRAPH_LIBRARIES}
+  ${OPENGL_LIBRARIES}
+  )
+
+
+
+
+
+
+
 # add_executable(clouds
 #   test/clouds.cpp
 

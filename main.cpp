@@ -142,6 +142,120 @@ public:
   }
 };
 
+/* --- Infinite Plane --- */
+
+class InfinitePlaneCB : public osg::Drawable::DrawCallback
+{
+  void 	drawImplementation (osg::RenderInfo &, const osg::Drawable *) const override;
+};
+
+void 	InfinitePlaneCB::drawImplementation (osg::RenderInfo &, const osg::Drawable *) const
+{
+}
+
+class InfinitePlane : public osg::Transform
+{
+public:
+  InfinitePlane();
+  // META_Node(Soleil, InfinitePlane);
+
+  virtual bool computeLocalToWorldMatrix(osg::Matrix&      matrix,
+                                         osg::NodeVisitor* nv) const;
+  virtual bool computeWorldToLocalMatrix(osg::Matrix&      matrix,
+                                         osg::NodeVisitor* nv) const;
+
+protected:
+  virtual ~InfinitePlane() {}
+};
+
+InfinitePlane::InfinitePlane()
+{
+  // fogPlane->getOrCreateStateSet()->setRenderingHint(
+  //   osg::StateSet::TRANSPARENT_BIN);
+  // fogPlane->getOrCreateStateSet()->setMode(GL_LIGHTING,
+  //                                          osg::StateAttribute::OFF);
+  // osg::ref_ptr<osg::StateAttribute> blend =
+  //   new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
+  //                      osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
+  // {
+  //   osg::StateSet* stateset = fogPlane->getOrCreateStateSet();
+  //   stateset->setAttributeAndModes(blend, osg::StateAttribute::ON);
+  //   auto mask = fogPlane->getNodeMask();
+  //   mask &= ~Soleil::SceneManager::Mask::Collision;
+  //   mask &= ~Soleil::SceneManager::Mask::Shootable;
+  //   fogPlane->setNodeMask(mask);
+  // }
+  setReferenceFrame(osg::Transform::ABSOLUTE_RF);
+  setCullingActive(false);
+  osg::StateSet* ss = getOrCreateStateSet();
+  // ss->setAttributeAndModes(new osg::Depth(osg::Depth::LEQUAL, 1.0f, 1.0f));
+  ss->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+  ss->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
+  ss->setRenderBinDetails(5, "RenderBin");
+}
+
+bool
+InfinitePlane::computeLocalToWorldMatrix(osg::Matrix&      matrix,
+                                         osg::NodeVisitor* nv) const
+{
+
+  // n, f	= distances to near, far planes
+  // e		= focal length = 1 / tan(FOV / 2)
+  // a		= viewport height / width
+  // ---
+  // e	0	0	0
+  // 0	e/a	0	0
+  // 0	0	-1	-2n
+  // 0	0	-1	0
+
+  if (nv && nv->getVisitorType() == osg::NodeVisitor::CULL_VISITOR) {
+    osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(nv);
+
+    double fovy = 0.8;
+    double a    = 1080.0 / 1920.0;
+    double n    = 0.01;
+    double zFar = 1000.0;
+    // const bool isPersp =
+    //   cv->getCurrentCamera()->getProjectionMatrixAsPerspective(fovy, a, n,
+    //                                                            zFar);
+    float e = 1.0f / tan(fovy / 2.0f);
+    a       = cv->getCurrentCamera()->getViewport()->height() /
+        cv->getCurrentCamera()->getViewport()->width();
+
+    // clang-format off
+    osg::Matrix infinite(e	, 0	, 0	, 0		,
+			 0	, e/a	, 0	, 0		,
+			 0	, 0	, -1.0f	, -2.0f * n	,
+			 0	, 0	, -1.0f	, 0
+			 );
+    // clang-format on
+    SOLEIL__LOGGER_DEBUG("fovy=", fovy, ", a=", a, ", n=", n, ", zFar=", zFar,
+                         "\nINFINITY = ", infinite);
+
+    matrix.preMult(infinite);
+    //matrix = infinite;
+    return true;
+  } else {
+    return osg::Transform::computeLocalToWorldMatrix(matrix, nv);
+  }
+}
+
+bool
+InfinitePlane::computeWorldToLocalMatrix(osg::Matrix&      matrix,
+                                         osg::NodeVisitor* nv) const
+{
+  if (nv && nv->getVisitorType() == osg::NodeVisitor::CULL_VISITOR) {
+    assert(false);
+    // TODO:
+    osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(nv);
+    matrix.postMult(osg::Matrix::translate(-cv->getEyeLocal()));
+    return true;
+  } else
+    return osg::Transform::computeWorldToLocalMatrix(matrix, nv);
+}
+
+/* --- Infinite Plane --- */
+
 class ExplosionCullCallback : public osg::DrawableCullCallback
 {
 public:
@@ -927,6 +1041,28 @@ FirstLevelSetup(osg::ref_ptr<osg::Group> scene, osgViewer::Viewer& viewer)
   //   fogModel->setNodeMask(0);
   // }
   // scene->addChild(fogModel);
+
+  // new Test fog plane:
+  osg::ref_ptr<osg::Node> fogPlane =
+    osgDB::readNodeFile("../media/ZincFogSurface.osgt");
+  fogPlane->getOrCreateStateSet()->setRenderingHint(
+    osg::StateSet::TRANSPARENT_BIN);
+  fogPlane->getOrCreateStateSet()->setMode(GL_LIGHTING,
+                                           osg::StateAttribute::OFF);
+  osg::ref_ptr<osg::StateAttribute> blend =
+    new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
+                       osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
+  {
+    osg::StateSet* stateset = fogPlane->getOrCreateStateSet();
+    stateset->setAttributeAndModes(blend, osg::StateAttribute::ON);
+    auto mask = fogPlane->getNodeMask();
+    mask &= ~Soleil::SceneManager::Mask::Collision;
+    mask &= ~Soleil::SceneManager::Mask::Shootable;
+    fogPlane->setNodeMask(mask);
+  }
+  osg::ref_ptr<InfinitePlane> inf = new InfinitePlane();
+  inf->addChild(fogPlane);
+  scene->addChild(inf);
 
   // Add fog
   osg::ref_ptr<osg::Fog> fog = new osg::Fog;
