@@ -212,7 +212,7 @@ ImGUIEventHandler::render(osg::RenderInfo& renderInfo)
   extensions->glUniformMatrix4fv(AttribLocationProjMtx, 1, GL_FALSE,
                                  &ortho_projection[0][0]);
   extensions->glBindSampler(0, 0);
-  extensions->glBindVertexArray(VaoHandle);
+  //extensions->glBindVertexArray(VaoHandle);
 
   for (int n = 0; n < draw_data->CmdListsCount; n++) {
     const ImDrawList* cmd_list          = draw_data->CmdLists[n];
@@ -445,7 +445,7 @@ ImGUIEventHandler::initialize(osg::RenderInfo& renderInfo)
   extensions->glGenBuffers(1, &ElementsHandle);
 
   extensions->glGenVertexArrays(1, &VaoHandle);
-  extensions->glBindVertexArray(VaoHandle);
+  //extensions->glBindVertexArray(VaoHandle);
   extensions->glBindBuffer(GL_ARRAY_BUFFER, VboHandle);
   extensions->glEnableVertexAttribArray(AttribLocationPosition);
   extensions->glEnableVertexAttribArray(AttribLocationUV);

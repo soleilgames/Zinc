@@ -43,110 +43,7 @@
 #include <osgParticle/ParticleSystemUpdater>
 #include <osgViewer/Viewer>
 
-class InfinitePlane : public osg::Transform
-{
-public:
-  InfinitePlane();
-  // META_Node(Soleil, InfinitePlane);
-
-  virtual bool computeLocalToWorldMatrix(osg::Matrix&      matrix,
-                                         osg::NodeVisitor* nv) const;
-  virtual bool computeWorldToLocalMatrix(osg::Matrix&      matrix,
-                                         osg::NodeVisitor* nv) const;
-
-protected:
-  virtual ~InfinitePlane() {}
-};
-
-InfinitePlane::InfinitePlane()
-{
-  // fogPlane->getOrCreateStateSet()->setRenderingHint(
-  //   osg::StateSet::TRANSPARENT_BIN);
-  // fogPlane->getOrCreateStateSet()->setMode(GL_LIGHTING,
-  //                                          osg::StateAttribute::OFF);
-  // osg::ref_ptr<osg::StateAttribute> blend =
-  //   new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
-  //                      osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
-  // {
-  //   osg::StateSet* stateset = fogPlane->getOrCreateStateSet();
-  //   stateset->setAttributeAndModes(blend, osg::StateAttribute::ON);
-  //   auto mask = fogPlane->getNodeMask();
-  //   mask &= ~Soleil::SceneManager::Mask::Collision;
-  //   mask &= ~Soleil::SceneManager::Mask::Shootable;
-  //   fogPlane->setNodeMask(mask);
-  // }
-  setReferenceFrame(osg::Transform::ABSOLUTE_RF);
-  setCullingActive(false);
-  osg::StateSet* ss = getOrCreateStateSet();
-  // ss->setAttributeAndModes(new osg::Depth(osg::Depth::LEQUAL, 1.0f, 1.0f));
-  ss->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-  ss->setMode(GL_CULL_FACE, osg::StateAttribute::OFF);
-  ss->setRenderBinDetails(5, "RenderBin");
-}
-
-bool
-InfinitePlane::computeLocalToWorldMatrix(osg::Matrix&      matrix,
-                                         osg::NodeVisitor* nv) const
-{
-
-  // n, f	= distances to near, far planes
-  // e		= focal length = 1 / tan(FOV / 2)
-  // a		= viewport height / width
-  // ---
-  // e	0	0	0
-  // 0	e/a	0	0
-  // 0	0	-1	-2n
-  // 0	0	-1	0
-
-  if (nv && nv->getVisitorType() == osg::NodeVisitor::CULL_VISITOR) {
-    osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(nv);
-
-    double fovy = 0.8;
-    double a    = 1080.0 / 1920.0;
-    double n    = 0.01;
-    double zFar = 1000.0;
-    // const bool isPersp =
-    //   cv->getCurrentCamera()->getProjectionMatrixAsPerspective(fovy, a, n,
-    //                                                            zFar);
-    float e = 1.0f / tan(fovy / 2.0f);
-    a       = cv->getCurrentCamera()->getViewport()->height() /
-        cv->getCurrentCamera()->getViewport()->width();
-
-    // clang-format off
-    osg::Matrix infinite(e	, 0	, 0	, 0		,
-			 0	, e/a	, 0	, 0		,
-			 0	, 0	, -1.0f	, -2.0f * n	,
-			 0	, 0	, -1.0f	, 0
-			 );
-    // clang-format on
-    SOLEIL__LOGGER_DEBUG(
-      "fovy=", fovy, ", a=", a, ", n=", n, ", zFar=", zFar,
-      "\nINFINITY = ", infinite,
-      "\ninfinite * osg::Vec3(0, 1, 0) = ", infinite * osg::Vec3(0, 1, 0));
-
-    matrix.preMult(infinite);
-    // matrix = infinite;
-    return true;
-  } else {
-    return osg::Transform::computeLocalToWorldMatrix(matrix, nv);
-  }
-}
-
-bool
-InfinitePlane::computeWorldToLocalMatrix(osg::Matrix&      matrix,
-                                         osg::NodeVisitor* nv) const
-{
-  if (nv && nv->getVisitorType() == osg::NodeVisitor::CULL_VISITOR) {
-    assert(false);
-    // TODO:
-    osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(nv);
-    matrix.postMult(osg::Matrix::translate(-cv->getEyeLocal()));
-    return true;
-  } else
-    return osg::Transform::computeWorldToLocalMatrix(matrix, nv);
-}
-
-/* --- Infinite Plane --- */
+static bool computed = false;
 
 static void
 drawUI(void)
@@ -218,10 +115,239 @@ DebugTrackball::handle(const osgGA::GUIEventAdapter& event,
         };
         break;
       }
+      case KEY::KEY_O: {
+        computed = true;
+      }
     }
   }
   return TrackballManipulator::handle(event, us);
 }
+
+/* --- Infinite Plane --- */
+
+class InfinitePlane : public osg::Geometry
+{
+public:
+  InfinitePlane(osg::Plane plane);
+
+  void update(const osg::Matrix& invertedViewProjectionMatrix);
+
+protected:
+  ~InfinitePlane() {}
+
+protected:
+  osg::Plane plane;
+
+protected:
+  osg::ref_ptr<osg::Vec3Array> vertices;
+};
+
+static constexpr int NumVertices = 12;
+
+InfinitePlane::InfinitePlane(osg::Plane plane)
+  : plane(plane)
+  , vertices(
+      new osg::Vec3Array(osg::Array::Binding::BIND_PER_VERTEX, NumVertices))
+{
+  // (*vertices)[0] = osg::Vec3();
+  // (*vertices)[1] = osg::Vec3();
+  // (*vertices)[2] = osg::Vec3();
+  // (*vertices)[3] = osg::Vec3();
+
+  float a        = 100.0f;
+  (*vertices)[0] = osg::Vec3(-1, -1, 0) * a;
+  (*vertices)[1] = osg::Vec3(1, -1, 0) * a;
+  (*vertices)[2] = osg::Vec3(1, 1, 0) * a;
+  (*vertices)[3] = osg::Vec3(-1, 1, 0) * a;
+
+  osg::ref_ptr<osg::Vec3Array> normals =
+    new osg::Vec3Array(osg::Array::Binding::BIND_PER_VERTEX, NumVertices);
+  osg::ref_ptr<osg::Vec4Array> colors =
+    new osg::Vec4Array(osg::Array::Binding::BIND_PER_VERTEX, NumVertices);
+
+  for (int i = 0; i < NumVertices; ++i) {
+    //(*normals)[i] = plane.getNormal();
+    (*normals)[i] = VectorUp();
+    (*colors)[i]  = (i < 4) ? osg::Vec4(1, 0, 0, 1) : osg::Vec4(0, 0, 1, 1);
+  }
+
+  setDataVariance(osg::Object::DataVariance::DYNAMIC);
+  setUseDisplayList(false);
+  setUseVertexBufferObjects(true);
+  setVertexArray(vertices);
+  setNormalArray(normals);
+  setColorArray(colors);
+  addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 0, 4));
+  addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 4, 4));
+  this->setCullingActive(false);
+  dirtyGLObjects();
+  // TODO: Do not cull
+}
+
+static bool
+IntersectSegmentPlane(const osg::Vec3& src, const osg::Vec3& dest,
+                      const osg::Plane& p, float& t, osg::Vec3& q)
+{
+  const osg::Vec3 direction = normalize(dest - src);
+  t = (p.asVec4().w() - (p.getNormal() * src)) / (p.getNormal() * direction);
+
+  // If t in [0..1] compute and return intersection point
+  if (t >= 0.0f && t <= 1.0f)
+    {
+      q = src + direction * t;
+      return true;
+    }
+
+  return false;
+}
+
+void
+InfinitePlane::update(const osg::Matrix& invertedViewProjectionMatrix)
+{
+  if (computed) return;
+
+// clang-format off
+  #if 1
+  // OpenGL coorindates (render front and back planes)
+  osg::Vec3 CubeCoordinates[8]{
+      osg::Vec3(-1.0f, -1.0f, 1.0f),
+      osg::Vec3( 1.0f, -1.0f, 1.0f),
+      osg::Vec3( 1.0f,  1.0f, 1.0f),
+      osg::Vec3(-1.0f,  1.0f, 1.0f),
+      
+      osg::Vec3(-1.0f, -1.0f, -1.0f),
+      osg::Vec3( 1.0f, -1.0f, -1.0f),
+      osg::Vec3( 1.0f,  1.0f, -1.0f),
+      osg::Vec3(-1.0f,  1.0f, -1.0f)};
+  #elif 0
+  // OSG coorindates (render up and down plane)
+  osg::Vec3 CubeCoordinates[8]{
+    osg::Vec3(  -1.0f, 1.0f, -1.0f),
+      osg::Vec3( 1.0f, 1.0f, -1.0f),
+      osg::Vec3( 1.0f, 1.0f,  1.0f),
+      osg::Vec3(-1.0f, 1.0f,  1.0f),
+      
+      osg::Vec3(-1.0f, -1.0f, -1.0f),
+      osg::Vec3( 1.0f, -1.0f, -1.0f),
+      osg::Vec3( 1.0f, -1.0f,  1.0f),
+      osg::Vec3(-1.0f, -1.0f,  1.0f)};
+
+  #elif 0
+  float ar = 1920.0f / 1080.0f;
+  float fov = 60.f;
+  float near = 0.1f;
+  float far = 1000.f;
+  float halfHeight = tanf(osg::DegreesToRadians(fov / 2.f));
+  float halfWidth = halfHeight * ar;
+
+  float xn = halfWidth * near;
+  float xf = halfWidth * far;
+  float yn = halfHeight * near;
+  float yf = halfHeight * far;
+
+  osg::Vec3 CubeCoordinates[] 
+  {
+    // near face
+    {xn,  near, yn   },
+    {-xn, near,  yn },
+    {xn,  near, -yn },
+    {-xn, near,  -yn},
+
+    // far face
+    {xf  , far, yf  },
+    {-xf, far , yf  },
+    {xf  , far, -yf },
+    {-xf, far , -yf },
+};
+  #endif
+// clang-format on
+
+#if 0
+
+  // (*vertices)[0] = osg::Vec3(100, 0, 100);
+  // (*vertices)[1] = osg::Vec3(-100, 0, 100);
+  // (*vertices)[2] = osg::Vec3(-100, 0, -100);
+  // (*vertices)[3] = osg::Vec3(100, 0, -100);
+
+  for (int i = 0; i < 4 /*8*/; ++i) {
+    (*vertices)[i] = invertedViewProjectionMatrix * CubeCoordinates[i];
+    SOLEIL__LOGGER_DEBUG("(*vertices)[", i, "]=", (*vertices)[i]);
+  }
+#else
+  for (int i = 0; i < NumVertices /*8*/; ++i) {
+    osg::Vec4 r =
+      osg::Vec4(CubeCoordinates[i], 1.0f) * invertedViewProjectionMatrix;
+    r = r / r.w();
+    // (*vertices)[i].x() = r.x() * (1.0f / r.w());
+    // (*vertices)[i].y() = r.y() * (1.0f / r.w());
+    // (*vertices)[i].z() = r.z() * (1.0f / r.w());
+    (*vertices)[i].x() = r.x();
+    (*vertices)[i].y() = r.y();
+    (*vertices)[i].z() = r.z();
+
+    SOLEIL__LOGGER_DEBUG("(*vertices)[", i, "]=", (*vertices)[i]);
+  }
+#endif
+  vertices->dirty();
+
+  // dirtyBound();
+}
+
+class InfinitePlaneCallback : public osg::Callback
+{
+  bool run(osg::Object* object, osg::Object* data);
+};
+
+bool
+InfinitePlaneCallback::run(osg::Object* object, osg::Object* data)
+{
+  osgUtil::CullVisitor* c = data->asNodeVisitor()->asCullVisitor();
+  assert(c && "Not a cull visitor");
+
+  int u = 0;
+  SOLEIL__LOGGER_DEBUG("----------------------------------------");
+  for (auto const& v : c->getState()->getViewFrustum().getPlaneList()) {
+    SOLEIL__LOGGER_DEBUG(u++, ": ", v);
+  }
+
+// c->getCurrentCamera()->setProjectionMatrixAsPerspective(0.8f, 1920.0f /
+// 1080.0f,
+//                                                      0.1, 1000);
+
+#if 1
+  osg::Matrix invertedViewProjectionMatrix =
+    osg::Matrix::inverse(c->getCurrentCamera()->getViewMatrix() *
+                         c->getCurrentCamera()->getProjectionMatrix());
+#elif 0
+  // clang-format off
+  osg::Matrix invertedViewProjectionMatrix;
+  // invertedViewProjectionMatrix.transpose(osg::Matrix(
+  // 					   1, 0, 0, 0,
+  // 					   0, 1, 0, 0,
+  // 					   0, 0, 1, 0,
+  // 					   0, 0, 1, 0
+  // 						     ));
+
+  // invertedViewProjectionMatrix.preMult(osg::Matrix::inverse(
+  // 			 c->getCurrentCamera()->getViewMatrix() *
+  //                        c->getCurrentCamera()->getProjectionMatrix()));
+// clang-format on
+#elif 0
+  osg::Matrix invertedViewProjectionMatrix =
+    osg::Matrix::inverse(c->getCurrentCamera()->getProjectionMatrix() *
+                         c->getCurrentCamera()->getViewMatrix());
+
+#endif
+  SOLEIL__LOGGER_DEBUG((void*)c->getCurrentCamera(), ">>> ",
+                       c->getCurrentCamera()->getProjectionMatrix(), "\n====\n",
+                       c->getState()->getProjectionMatrix());
+
+  static_cast<InfinitePlane*>(object)->update(invertedViewProjectionMatrix);
+
+  return traverse(object, data);
+}
+
+/* --- Infinite Plane --- */
 
 int
 main(int // argc
@@ -246,116 +372,58 @@ main(int // argc
   player->setPosition(osg::Vec3(0, 0, 10));
   osg::ref_ptr<Soleil::EntityGroup> playerEntityGroup = new Soleil::EntityGroup;
   playerEntityGroup->addChild(player);
-  scene->addChild(playerEntityGroup);
+  // scene->addChild(playerEntityGroup);
 
-  //scene->addChild(osgDB::readNodeFile("../media/ZincMoutonRose.osgt"));
+  // scene->addChild(osgDB::readNodeFile("../media/ZincMoutonRose.osgt"));
 
-  viewer.getCamera()->setComputeNearFarMode(
-    osg::CullSettings::COMPUTE_NEAR_FAR_USING_PRIMITIVES);
+  // ------------------------------
+  osg::ref_ptr<InfinitePlane> p =
+    new InfinitePlane(osg::Plane(osg::Vec3(0, 0, 1), osg::Vec3()));
+  p->addCullCallback(new InfinitePlaneCallback);
+  osg::ref_ptr<osg::Geode> g = new osg::Geode;
+  g->addDrawable(p);
+  scene->addChild(g);
+
+  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+  vertices->push_back(osg::Vec3(0.0f, 0.0f, 0.0f));
+  vertices->push_back(osg::Vec3(1.0f, 0.0f, 0.0f));
+  vertices->push_back(osg::Vec3(1.0f, 0.0f, 1.0f));
+  vertices->push_back(osg::Vec3(0.0f, 0.0f, 1.0f));
+  osg::ref_ptr<osg::Vec3Array> normals = new osg::Vec3Array;
+  normals->push_back(osg::Vec3(0.0f, -1.0f, 0.0f));
+  osg::ref_ptr<osg::Vec4Array> colors = new osg::Vec4Array;
+  colors->push_back(osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+  colors->push_back(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f));
+  colors->push_back(osg::Vec4(0.0f, 0.0f, 1.0f, 1.0f));
+  colors->push_back(osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+  osg::ref_ptr<osg::Geometry> quad = new osg::Geometry;
+  quad->setVertexArray(vertices.get());
+  quad->setNormalArray(normals.get());
+  quad->setNormalBinding(osg::Geometry::BIND_OVERALL);
+  quad->setColorArray(colors.get());
+  quad->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+  quad->addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 0, 4));
+  g->addDrawable(quad);
+  // ------------------------------
+
+  // viewer.getCamera()->setComputeNearFarMode(
+  //   osg::CullSettings::COMPUTE_NEAR_FAR_USING_PRIMITIVES);
+  // viewer.getCamera()->setComputeNearFarMode(
+  //   osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
   viewer.realize();
 
-  // -------------------------------------
-  {
-    osg::ref_ptr<osg::Camera> camera = new osg::Camera;
-    // camera->setAllowEventFocus(false);
-    camera->setClearColor(osg::Vec4(1, 0, 0, 0));
-    //camera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
-    //camera->setReferenceFrame(osg::Transform::ABSOLUTE_RF_INHERIT_VIEWPOINT);
-    // camera->setClearMask(GL_DEPTH_BUFFER_BIT);
-    camera->setClearMask(0);
-
-    // osg::ref_ptr<InfinitePlane> inf  = new InfinitePlane();
-    osg::ref_ptr<osg::Node> fogPlane =
-      osgDB::readNodeFile("../media/ZincFogSurface.osgt");
-    fogPlane->getOrCreateStateSet()->setRenderingHint(
-      osg::StateSet::TRANSPARENT_BIN);
-    fogPlane->getOrCreateStateSet()->setMode(GL_LIGHTING,
-                                             osg::StateAttribute::OFF);
-    osg::ref_ptr<osg::StateAttribute> blend =
-      new osg::BlendFunc(osg::BlendFunc::BlendFuncMode::SRC_ALPHA,
-                         osg::BlendFunc::BlendFuncMode::ONE_MINUS_SRC_ALPHA);
-    {
-      osg::StateSet* stateset = fogPlane->getOrCreateStateSet();
-      stateset->setAttributeAndModes(blend, osg::StateAttribute::ON);
-      auto mask = fogPlane->getNodeMask();
-      mask &= ~Soleil::SceneManager::Mask::Collision;
-      mask &= ~Soleil::SceneManager::Mask::Shootable;
-      fogPlane->setNodeMask(mask);
-    }
-    // fogPlane->setCullingActive(false);
-    // inf->addChild(fogPlane);
-    camera->addChild(fogPlane);
-    ///////////////////////////////
-    double     fovy = 0.8;
-    double     a    = 1080.0 / 1920.0;
-    double     n    = 1000.01;
-    double     zFar = 1000.0;
-    const bool isPersp =
-      viewer.getCamera()->getProjectionMatrixAsPerspective(fovy, a, n, zFar);
-    assert(isPersp);
-    float e = 1.0f / tan(fovy / 2.0f);
-
-    // a       = viewer.getCamera()->getViewport()->height() /
-    //     viewer.getCamera()->getViewport()->width();
-#if 1
-    // clang-format off
-    osg::Matrix infinite(e	, 0	, 0	, 0		,
-			 0	, e/a	, 0	, 0		,
-			 0	, 0	, -1.0f	, -2.0f * n	,
-			 0	, 0	, -1.0f	, 0
-			 );
-    // clang-format on
-    osg::Matrix infiniteT;
-    const bool transposed = infiniteT.transpose(infinite);
-    infiniteT = osg::Matrix::inverse(infiniteT);
-    assert(transposed);
-    SOLEIL__LOGGER_DEBUG("fovy=", fovy, ", a=", a, ", n=", n, ", zFar=", zFar,
-                         "\nINFINITY = ", infiniteT,
-                         "\ninfiniteT * osg::Vec4(0, 1, 21, 0) = ",
-                         infiniteT * osg::Vec4(0, 1, 0, 0));
-
-    camera->setProjectionMatrix(infiniteT);
-#else
-    osg::Vec4d frustum;
-    bool       isFrustum = viewer.getCamera()->getProjectionMatrixAsFrustum(
-      frustum.x(), frustum.y(), frustum.z(), frustum.w(), n, zFar);
-    assert(isFrustum);
-    SOLEIL__LOGGER_DEBUG("frustum=", frustum);
-    const float r = frustum.y();
-    const float t = frustum.w();
-    // clang-format off
-    osg::Matrix infinite(n / r	, 0	, 0	, 0		,
-			 0	, n / t	, 0	, 0		,
-			 0	, 0	, -1.0f	, -2.0f * n	,
-			 0	, 0	, -1.0f	, 0
-			 );
-    // clang-format on
-    SOLEIL__LOGGER_DEBUG("fovy=", fovy, ", a=", a, ", n=", n, ", zFar=", zFar,
-                         "\nINFINITY = ", infinite,
-                         "\ninfinite * osg::Vec4(0, 1, 21, 0) = ",
-                         infinite * osg::Vec4(0, 1, 0, 0));
-
-    camera->setProjectionMatrix(infinite);
-#endif
-    // camera->setViewMatrix(osg::Matrix::lookAt(osg::Vec3(), VectorFront(),
-    // VectorUp()));
-    // camera->setViewMatrix(
-    //   osg::Matrix::lookAt(osg::Vec3(0, 0, 0), osg::Vec3(0, 1, 0), VectorUp()));
-    //camera->setEventCallback(new CamCB);
-
-    scene->addChild(camera);
-  }
-  ///////////////////////////////
-  // ------------------------------
+  viewer.getCamera()->setProjectionMatrixAsPerspective(0.8f, 1920.0f / 1080.0f,
+                                                       0.1, 1000);
 
   //----------------------------------------------------
   // Setup of the ImGUI
-  osg::Camera* camera = viewer.getCamera();
-  assert(camera);
-  osg::ref_ptr<ImGUIEventHandler> imguiHandler = new ImGUIEventHandler{drawUI};
-  viewer.addEventHandler(imguiHandler);
-  camera->setPreDrawCallback(new ImGUINewFrame{*imguiHandler});
-  camera->setPostDrawCallback(new ImGUIRender{*imguiHandler});
+  // osg::Camera* camera = viewer.getCamera();
+  // assert(camera);
+  // osg::ref_ptr<ImGUIEventHandler> imguiHandler = new
+  // ImGUIEventHandler{drawUI};
+  // viewer.addEventHandler(imguiHandler);
+  // camera->setPreDrawCallback(new ImGUINewFrame{*imguiHandler});
+  // camera->setPostDrawCallback(new ImGUIRender{*imguiHandler});
 
   osg::ref_ptr<DebugTrackball> cam = new DebugTrackball;
   cam->root                        = scene;
@@ -363,15 +431,17 @@ main(int // argc
   viewer.getUpdateVisitor()->setTraversalMask(2);
   viewer.setCameraManipulator(cam);
   viewer.setLightingMode(osg::View::SKY_LIGHT);
+  return viewer.run();
+
   double previousTime = viewer.getFrameStamp()->getSimulationTime();
   while (!viewer.done()) {
     viewer.frame();
 
     // Update events
-    double deltaTime =
-      viewer.getFrameStamp()->getSimulationTime() - previousTime;
-    Soleil::EventManager::ProcessEvents(deltaTime);
-    previousTime = viewer.getFrameStamp()->getSimulationTime();
+    // double deltaTime =
+    //   viewer.getFrameStamp()->getSimulationTime() - previousTime;
+    // Soleil::EventManager::ProcessEvents(deltaTime);
+    // previousTime = viewer.getFrameStamp()->getSimulationTime();
   }
   return 0;
 }
