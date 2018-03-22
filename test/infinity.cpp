@@ -168,7 +168,13 @@ InfinitePlane::InfinitePlane(osg::Plane plane)
   for (int i = 0; i < NumVertices; ++i) {
     //(*normals)[i] = plane.getNormal();
     (*normals)[i] = VectorUp();
-    (*colors)[i]  = (i < 4) ? osg::Vec4(1, 0, 0, 1) : osg::Vec4(0, 0, 1, 1);
+    if (i < 4) {
+      (*colors)[i] = osg::Vec4(1, 0, 0, 0.1);
+    } else if (i < 8) {
+      (*colors)[i] = osg::Vec4(0, 0, 1, 0.1);
+    } else {
+      (*colors)[i] = osg::Vec4(0, 1, 0, 1);
+    }
   }
 
   setDataVariance(osg::Object::DataVariance::DYNAMIC);
@@ -177,8 +183,9 @@ InfinitePlane::InfinitePlane(osg::Plane plane)
   setVertexArray(vertices);
   setNormalArray(normals);
   setColorArray(colors);
-  addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 0, 4));
-  addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 4, 4));
+  // addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 0, 4));
+  // addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 4, 4));
+  addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 8, 4));
   this->setCullingActive(false);
   dirtyGLObjects();
   // TODO: Do not cull
@@ -188,15 +195,15 @@ static bool
 IntersectSegmentPlane(const osg::Vec3& src, const osg::Vec3& dest,
                       const osg::Plane& p, float& t, osg::Vec3& q)
 {
-  const osg::Vec3 direction = normalize(dest - src);
+  const osg::Vec3 direction = dest - src;
   t = (p.asVec4().w() - (p.getNormal() * src)) / (p.getNormal() * direction);
 
+  SOLEIL__LOGGER_DEBUG("T=", t);
   // If t in [0..1] compute and return intersection point
-  if (t >= 0.0f && t <= 1.0f)
-    {
-      q = src + direction * t;
-      return true;
-    }
+  if (t >= 0.0f && t <= 1.0f) {
+    q = src + direction * t;
+    return true;
+  }
 
   return false;
 }
@@ -263,18 +270,13 @@ InfinitePlane::update(const osg::Matrix& invertedViewProjectionMatrix)
 // clang-format on
 
 #if 0
-
-  // (*vertices)[0] = osg::Vec3(100, 0, 100);
-  // (*vertices)[1] = osg::Vec3(-100, 0, 100);
-  // (*vertices)[2] = osg::Vec3(-100, 0, -100);
-  // (*vertices)[3] = osg::Vec3(100, 0, -100);
-
   for (int i = 0; i < 4 /*8*/; ++i) {
     (*vertices)[i] = invertedViewProjectionMatrix * CubeCoordinates[i];
     SOLEIL__LOGGER_DEBUG("(*vertices)[", i, "]=", (*vertices)[i]);
   }
 #else
-  for (int i = 0; i < NumVertices /*8*/; ++i) {
+  // Draw Frustrum
+  for (int i = 0; i < 8; ++i) {
     osg::Vec4 r =
       osg::Vec4(CubeCoordinates[i], 1.0f) * invertedViewProjectionMatrix;
     r = r / r.w();
@@ -286,6 +288,22 @@ InfinitePlane::update(const osg::Matrix& invertedViewProjectionMatrix)
     (*vertices)[i].z() = r.z();
 
     SOLEIL__LOGGER_DEBUG("(*vertices)[", i, "]=", (*vertices)[i]);
+  }
+
+  // Render Plane
+  for (int i = 0; i < 4; ++i) {
+    osg::Vec3 intersection{};
+    float     t = 0.0f;
+
+    if (IntersectSegmentPlane(vertices->at(i), vertices->at(i + 4), plane, t,
+                              intersection)) {
+      (*vertices)[i + 8] = intersection;
+      SOLEIL__LOGGER_DEBUG("Intersection: (", i, "): ", intersection);
+    } else {
+      // TODO:
+      //(*vertices)[i + 8] = intersection;
+      SOLEIL__LOGGER_DEBUG(i, "  :(");
+    }
   }
 #endif
   vertices->dirty();
